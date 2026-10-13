@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import pager with context %}
+{% block title %}Mi tienda · Administración{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="section-heading">
+    <div><p class="eyebrow">Administración</p><h1 class="page-title">Hola, seño.</h1><p>Todo lo que necesitás para gestionar tus recursos.</p></div>
+    <form action="{{ url_for('main.logout') }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button">Cerrar sesión</button></form>
+  </div>
+  <div class="admin-stats">
+    <div><strong>{{ stats.products }}</strong><span>Recursos cargados</span></div>
+    <div><strong>{{ stats.published }}</strong><span>Recursos publicados</span></div>
+    <div><strong>{{ stats.pending }}</strong><span>Pedidos pendientes</span></div>
+  </div>
+  {% if not stats.products %}
+  <div class="notice onboarding-note"><strong>Tu tienda está lista para su primer recurso.</strong><p>Cargá una descripción, precio y foto. Si es digital, adjuntá el PDF o ZIP. Podés guardarlo como borrador y revisar la vista previa antes de publicarlo.</p><a class="button small" href="{{ url_for('main.edit_product') }}">Cargar mi primer recurso</a></div>
+  {% endif %}
+  <section id="mis-recursos">
+    <div class="section-heading"><h2>Mis recursos</h2><div class="resource-toolbar"><a class="button small secondary-button" href="{{ url_for('main.drive_browser') }}">Importar desde Drive</a><a class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
+    <form class="filters admin-filters" method="get" action="{{ url_for('main.admin') }}#mis-recursos">
+      <input type="hidden" name="pedido" value="{{ order_q }}"><input type="hidden" name="estado" value="{{ status }}">
+      <label>Buscar recurso<input type="search" name="recurso" value="{{ resource_q }}" placeholder="Título o categoría"></label>
+      <label>Visibilidad<select name="visibilidad"><option value="">Todos</option><option value="published" {% if visibility=='published' %}selected{% endif %}>Publicados</option><option value="draft" {% if visibility=='draft' %}selected{% endif %}>Borradores</option></select></label>
+      <button class="button">Filtrar</button>
+    </form>
+    <p class="muted">{{ product_pages.total }} recursos encontrados</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Recurso</th><th>Precio</th><th>Disponibilidad</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody>
+      {% for product in products %}
+      <tr>
+        <td><div class="admin-product-label">{% if product.image %}<img class="admin-thumbnail" src="{{ url_for('main.image', filename=product.image) }}" alt="" width="48" height="48">{% endif %}<div><strong>{{ product.title }}</strong><small>{{ product.category }} · {{ 'Digital' if product.kind=='digital' else 'Físico' }}</small></div></div></td>
+        <td>{{ product.price_cents|money }}</td>
+        <td>{{ 'Descargable' if product.kind=='digital' else 'Hecho a pedido' }}</td>
+        <td><span class="status-pill {{ 'status-published' if product.published else 'status-draft' }}">{{ 'Publicado' if product.published else 'Borrador' }}</span></td>
+        <td><div class="row-actions">
+          <a href="{{ url_for('main.edit_product', identifier=product.id) }}">Editar</a>
+          <a href="{{ url_for('main.preview_product', identifier=product.id) }}">Vista previa</a>
+          <form method="post" action="{{ url_for('main.publish_product', identifier=product.id, action='ocultar' if product.published else 'publicar') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="text-button">{{ 'Ocultar' if product.published else 'Publicar' }}</button>
+          </form>
+        </div></td>
+      </tr>
+      {% else %}<tr><td colspan="5">No hay recursos con esos filtros.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    {{ pager(product_pages, 'main.admin', 'recursos_pagina', 'mis-recursos') }}
+  </section>
+  <section id="mis-pedidos">
+    <h2>Mis pedidos</h2>
+    <form class="filters admin-filters" method="get" action="{{ url_for('main.admin') }}#mis-pedidos">
+      <input type="hidden" name="recurso" value="{{ resource_q }}"><input type="hidden" name="visibilidad" value="{{ visibility }}">
+      <label>Buscar pedido<input type="search" name="pedido" value="{{ order_q }}" placeholder="Número, nombre o correo"></label>
+      <label>Estado<select name="estado"><option value="">Todos</option>{% for value,label in [('pending','Pendiente de pago'),('paid','Pagado'),('cancelled','Cancelado'),('refunded','Pago revertido')] %}<option value="{{ value }}" {% if status==value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <button class="button">Filtrar</button>
+    </form>
+    <p class="muted">{{ order_pages.total }} pedidos encontrados</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead>
+      <tbody>{% for order in orders %}
+      <tr><td>#{{ order.id }}<small>{{ order.created_at.strftime('%d/%m/%Y') }}</small></td><td>{{ order.customer_name }}</td><td>{{ order.total_cents|money }}</td><td><span class="status-pill">{{ {'pending':'Pendiente','paid':'Pagado','cancelled':'Cancelado','refunded':'Pago revertido'}[order.status] }}</span></td><td><a href="{{ url_for('main.admin_order', identifier=order.id) }}">Ver pedido</a></td></tr>
+      {% else %}<tr><td colspan="5">No hay pedidos con esos filtros.</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {{ pager(order_pages, 'main.admin', 'pedidos_pagina', 'mis-pedidos') }}
+  </section>
+</section>
+{% endblock %}

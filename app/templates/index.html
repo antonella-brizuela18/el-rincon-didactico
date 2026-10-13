@@ -1,41 +1,13 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Recursos didácticos para jugar, aprender y crear.">
-  <title>El Rincón Didáctico</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <header class="site-header">
-    <a class="brand" href="/" aria-label="El Rincón Didáctico, inicio">
-      <span class="brand-mark" aria-hidden="true">✿</span>
-      <span>El Rincón Didáctico</span>
-    </a>
-    <span class="header-note">Recursos para aprender jugando</span>
-  </header>
-
-  <main>
-    <section class="hero">
-      <p class="eyebrow">Hecho con amor por una seño</p>
-      <h1>Ideas y recursos para <span>jugar en grande</span></h1>
-      <p class="intro">Materiales didácticos para acompañar la curiosidad, la creatividad y el juego de las infancias.</p>
-      <a class="primary-link" href="#catalogo">Conocer los recursos</a>
-      <div class="decor decor-one" aria-hidden="true">✳</div>
-      <div class="decor decor-two" aria-hidden="true">✿</div>
-    </section>
-
-    <section class="catalog" id="catalogo">
-      <p class="eyebrow">Un rincón para descubrir</p>
-      <h2>Próximamente, el catálogo</h2>
-      <p>Estamos preparando recursos imprimibles, juegos y materiales para disfrutar en casa y en el jardín.</p>
-      <p class="notice">La tienda está en construcción. Todavía no se pueden realizar compras ni pagos.</p>
-    </section>
-  </main>
-
-  <footer>
-    <p>El Rincón Didáctico · Recursos para aprender jugando</p>
-  </footer>
-</body>
-</html>
+{% extends "base.html" %}
+{% from "_pagination.html" import pager with context %}
+{% block title %}{{ "El Rincón Didáctico · Aprender jugando" if is_home else "Catálogo de recursos y materiales didácticos · El Rincón Didáctico" }}{% endblock %}
+{% block content %}
+{% if is_home %}
+<section class="hero"><div class="hero-copy"><p class="eyebrow">Un rincón hecho de ideas y amor</p><h1>{{ store.hero_title }}</h1><p class="intro">{{ store.hero_text }}</p><div class="hero-actions"><a class="button" href="{{ url_for('main.catalog') }}">Explorar recursos ↗</a><a href="#como-comprar">Cómo comprar</a></div><p class="hero-note">Para docentes, familias y pequeñas grandes mentes.</p></div><div class="play-board" aria-label="Ilustración de materiales para imaginar, jugar y crear"><span class="board-tag">TODO EMPIEZA JUGANDO</span><div class="learning-card"><span class="eyebrow">Pequeños descubrimientos</span><div class="rainbow"><i></i><i></i><i></i></div><strong>Aprender.<br>Imaginar.<br>Volver a jugar.</strong><span class="card-caption">El Rincón Didáctico</span></div><img class="board-flower" src="{{ url_for('static',filename='flower.svg') }}" alt="" width="120" height="120"><span class="board-heart" aria-hidden="true">♡</span><span class="board-sticker">hecho con<br>mucho amor</span><span class="board-pencil" aria-hidden="true"></span></div></section>
+<div class="ticker" aria-hidden="true">IMAGINAR <span>✿</span> EXPLORAR <span>✿</span> CREAR <span>✿</span> APRENDER JUGANDO <span>✿</span></div>
+{% else %}<section class="catalog-intro"><p class="eyebrow">La próxima aventura empieza acá</p><h1>Un mundo de recursos.</h1><p>Elegí una idea, prepará un espacio y dejá que aparezca la magia del juego.</p></section>{% endif %}
+<section class="section" id="catalogo"><div class="section-heading"><div><p class="eyebrow">Un rincón para descubrir</p><h2>{{ "Ideas para empezar" if is_home else "Encontrá tu próxima idea." }}</h2></div><p>{{ pagination.total }} {{ 'recurso encontrado' if pagination.total==1 else 'recursos encontrados' }}</p></div>
+<form class="filters" method="get" action="{{ url_for('main.catalog') }}"><label>Buscar<input type="search" name="q" value="{{ search }}" placeholder="¿Qué te gustaría trabajar?"></label><label>Categoría<select name="categoria"><option value="">Todas las categorías</option>{% for c in categories %}<option value="{{ c }}" {% if category==c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label><label>Formato<select name="tipo"><option value="">Todos los formatos</option><option value="digital" {% if kind=='digital' %}selected{% endif %}>Digital / imprimible</option><option value="physical" {% if kind=='physical' %}selected{% endif %}>Material físico</option></select></label><button class="button" type="submit">Buscar</button></form>
+<div class="product-grid">{% for product in products %}<article class="product-card"><a class="product-image" href="{{ url_for('main.product_detail', identifier=product.id) }}">{% if product.image %}<img src="{{ url_for('main.image', filename=product.image) }}" alt="{{ product.title }}" loading="lazy" width="600" height="450">{% else %}<span class="placeholder-art" aria-hidden="true">✿</span>{% endif %}<span class="badge">{{ 'Imprimible' if product.kind=='digital' else 'Material físico' }}</span></a><div class="product-copy"><p class="eyebrow">{{ product.category }}</p><h3><a href="{{ url_for('main.product_detail', identifier=product.id) }}">{{ product.title }}</a></h3><p>{{ product.age or 'Para aprender jugando' }}</p><div class="product-bottom"><strong>{{ product.price_cents|money }}</strong><a href="{{ url_for('main.product_detail', identifier=product.id) }}">Ver recurso ↗</a></div></div></article>{% else %}<div class="empty"><span aria-hidden="true">✿</span><h3>{{ 'No encontramos recursos con esos filtros.' if search or category or kind else 'Estamos preparando algo lindo.' }}</h3><p>{{ 'Probá con otra búsqueda o explorá todas las categorías.' if search or category or kind else 'Pronto vas a encontrar aquí nuestros juegos, imprimibles y materiales.' }}</p>{% if search or category or kind %}<a href="{{ url_for('main.catalog') }}">Ver todos los recursos</a>{% endif %}</div>{% endfor %}</div>{{ pager(pagination, 'main.catalog', 'pagina') }}</section>
+<section class="how-to section" id="como-comprar"><p class="eyebrow">Así de simple</p><h2>Del rincón a tus manos.</h2><div class="steps-grid"><article><b>01</b><h3>Encontrá tu idea</h3><p>Explorá los recursos y elegí lo que querés trabajar.</p></article><article><b>02</b><h3>Armá tu pedido</h3><p>Sumá tus favoritos al carrito y completá tus datos.</p></article><article><b>03</b><h3>Que empiece el juego</h3><p>Una vez confirmado el pago, descargá tus archivos o coordiná la entrega del material físico.</p></article></div></section><section class="story"><p class="eyebrow">El valor de lo simple</p><h2>Una idea pequeña puede<br>ser el comienzo de algo enorme.</h2><p>Un espacio pensado para docentes y familias que creen en el juego como una forma de descubrir el mundo.</p></section>
+{% endblock %}

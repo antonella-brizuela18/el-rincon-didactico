@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Importar desde Drive · Administración{% endblock %}
+{% block content %}
+<section class="section">
+  <a class="back" href="{{ url_for('main.edit_product', identifier=product_id) if product_id else url_for('main.admin') }}">← Volver {{ 'al recurso' if product_id else 'al panel' }}</a>
+  <p class="eyebrow">Tu biblioteca de materiales</p>
+  <h1 class="page-title">Importar desde Drive.</h1>
+  <p>Elegí un archivo y completá su descripción y precio. Se copiará al almacenamiento de la tienda al guardar; el original de Drive se conserva.</p>
+  {% if not configured %}
+  <div class="notice"><h2>Falta conectar tu carpeta.</h2><p>La tienda necesita su acceso de lectura a Google Drive. Una vez configurado en Alwaysdata, vas a poder elegir aquí PDFs, ZIPs, documentos e imágenes.</p><p>Los archivos de venta se guardan de forma privada y se habilitan después del pago.</p></div>
+  {% else %}
+    {% if error %}<div class="notice" role="alert">{{ error }}</div>{% endif %}
+    {% if folder %}
+    <div class="drive-heading"><h2>{{ folder.name }}</h2>{% if folder.id!=root_folder %}<a href="{{ url_for('main.drive_browser', producto=product_id) }}">Volver a la carpeta principal</a>{% endif %}</div>
+    <form class="filters" method="get">
+      <input type="hidden" name="carpeta" value="{{ folder.id }}">
+      {% if product_id %}<input type="hidden" name="producto" value="{{ product_id }}">{% endif %}
+      <label>Buscar en esta carpeta<input type="search" name="buscar" value="{{ search }}" placeholder="Nombre del archivo"></label>
+      <button class="button">Buscar</button>
+    </form>
+    <div class="drive-list">
+    {% for file in files %}
+      <article class="drive-item">
+        <span class="drive-icon" aria-hidden="true">{{ '▣' if file.mimeType==folder_mime else '✿' if file.mimeType in image_mimes else '▤' }}</span>
+        <div><h3>{{ file.name }}</h3><p class="muted">{{ 'Carpeta' if file.mimeType==folder_mime else 'Portada / imagen' if file.mimeType in image_mimes else 'Documento → PDF' if file.mimeType.startswith('application/vnd.google-apps.') else 'Recurso descargable' if file.mimeType in resource_mimes else 'Formato no compatible' }}</p></div>
+        {% if file.mimeType==folder_mime %}
+          <a class="button small" href="{{ url_for('main.drive_browser', carpeta=file.id, producto=product_id) }}">Abrir carpeta</a>
+        {% elif file.mimeType in resource_mimes %}
+          <a class="button small" href="{{ url_for('main.edit_product', identifier=product_id, drive_file=file.id) }}">{{ 'Usar como archivo' if product_id else 'Crear recurso' }}</a>
+        {% elif file.mimeType in image_mimes %}
+          <a class="button small" href="{{ url_for('main.edit_product', identifier=product_id, drive_image=file.id) }}">Usar como portada</a>
+        {% endif %}
+      </article>
+    {% else %}<div class="empty"><h3>No encontramos archivos en esta carpeta.</h3><p>Revisá los filtros o el acceso de lectura a los materiales.</p></div>{% endfor %}
+    </div>
+    {% if next_token %}<nav class="pagination" aria-label="Páginas de Drive"><a href="{{ url_for('main.drive_browser', carpeta=folder.id, producto=product_id, buscar=search, pagina=next_token) }}">Ver más archivos →</a></nav>{% endif %}
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
