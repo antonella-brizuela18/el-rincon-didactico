@@ -195,11 +195,13 @@ function useCartActions() {
     }) => {
       const form = new FormData();
       if (quantity) form.set("quantity", String(quantity));
-      return request<Cart & { messages: string[] }>(
+      const result = await request<Cart & { messages: string[] }>(
         `/carrito/${{ add: "agregar", remove: "quitar", quantity: "cantidad" }[action]}/${p.id}`,
         b.csrf,
         form,
       );
+      if(action==='add'&&!result.items.some(row=>row.product.id===p.id)) throw new Error(result.messages.join(' ')||'No se pudo agregar este recurso.');
+      return result;
     },
     retry: false,
     onMutate: async ({ p, action, quantity }) => {
@@ -469,7 +471,7 @@ function Shop({ home = false }: { home?: boolean }) {
       {notice && (
         <div className="r-toast" role="status">
           <Check size={20} />
-          <span>Agregado al carrito</span>
+          <span>{notice}</span>
           <Link to="/carrito">Ver carrito →</Link>
           <button onClick={() => setNotice("")} aria-label="Cerrar aviso">
             ×

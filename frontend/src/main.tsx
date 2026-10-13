@@ -19,7 +19,7 @@ const client = new QueryClient({
 });
 client.setQueryData(["cart"], data.cart);
 client.setQueryData(["catalog", window.location.search.slice(1)], data.catalog);
-for (const p of data.catalog.products)
+for (const p of [...data.catalog.products,...(data.featured||[])])
   client.setQueryData(["product", p.id], p);
 if (data.checkout)
   client.setQueryData(
