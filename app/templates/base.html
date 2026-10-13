@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es-AR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Recursos y materiales didácticos para acompañar el juego y el aprendizaje.">
+<title>{% block title %}El Rincón Didáctico{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head><body>
+<a class="skip" href="#contenido">Ir al contenido</a>
+<header class="site-header"><a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark" aria-hidden="true">✿</span><span>El Rincón<br><strong>Didáctico</strong></span></a>
+<nav aria-label="Navegación principal"><a href="{{ url_for('main.home') }}#catalogo">Recursos</a><a class="cart-link" href="{{ url_for('main.cart') }}">Mi carrito <span>{{ cart_count }}</span></a>
+{% if session.get('admin_id') %}<a href="{{ url_for('main.admin') }}">Administrar</a>{% endif %}</nav></header>
+{% with messages=get_flashed_messages() %}{% if messages %}<div class="flashes" role="status">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}{% endwith %}
+<main id="contenido">{% block content %}{% endblock %}</main>
+<footer><a class="brand" href="{{ url_for('main.home') }}">✿ El Rincón Didáctico</a><p>Pequeñas ideas. Grandes descubrimientos.</p><div>{% if config.CONTACT_EMAIL %}<a href="mailto:{{ config.CONTACT_EMAIL }}">Contactanos</a>{% endif %}<a href="{{ url_for('main.login') }}">Acceso de administración</a></div></footer>
+</body></html>

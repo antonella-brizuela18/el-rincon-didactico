@@ -1,24 +1,11 @@
-# Python
-__pycache__/
-*.py[cod]
-*.so
-.venv/
 venv/
-.env
-.env.*
+.venv/
+.env*
 !.env.example
 instance/
+__pycache__/
 .pytest_cache/
-.coverage
-htmlcov/
-
-# Local uploads and generated files
-uploads/
-private_files/
-*.log
-
-# Editor / OS
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
+*.pyc
+*.db
+*.sqlite*
+storage/
