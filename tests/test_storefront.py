@@ -93,3 +93,14 @@ def test_public_assets_compress_but_csrf_html_and_json_do_not(client):
     assert client.get('/ui.css',headers={'Accept-Encoding':'gzip;q=0'}).headers.get('Content-Encoding') is None
     for path in ['/','/api/carrito']:
         assert client.get(path,headers={'Accept-Encoding':'gzip'}).headers.get('Content-Encoding') is None
+
+
+def test_prefetched_quote_does_not_inflate_checkout_conversion(app,client):
+    client.post('/privacidad/medicion',data={'choice':'yes'})
+    client.post('/carrito/agregar/1',headers=JSON)
+    client.get('/pedido/nuevo',headers=JSON)
+    with app.extensions['sessions']() as db:
+        assert db.query(VisitEvent).filter_by(kind='checkout').count()==0
+    client.post('/api/evento',json={'kind':'checkout'})
+    with app.extensions['sessions']() as db:
+        assert db.query(VisitEvent).filter_by(kind='checkout').count()==1

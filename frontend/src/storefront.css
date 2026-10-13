@@ -1208,3 +1208,4 @@ body[data-mode="dark"] .r-app {
   --r-pink: #514533;
   --r-lime: #38432e;
 }
+.r-summary { align-self: start; }

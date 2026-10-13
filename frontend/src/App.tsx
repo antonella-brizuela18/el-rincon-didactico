@@ -340,7 +340,7 @@ function Shop({ home = false }: { home?: boolean }) {
           <div>
             <small className="r-eyebrow">ELEGÍ TU PRÓXIMA IDEA</small>
             <h2>{home ? "Elegidos para vos" : "Encontrá tu recurso"}</h2>
-            <p>{query.data?.total ?? b.catalog.total} recursos disponibles</p>
+            <p>{query.data?.total ?? b.catalog.total} {(query.data?.total ?? b.catalog.total) === 1 ? "recurso disponible" : "recursos disponibles"}</p>
           </div>
           <div className="r-tabs">
             {[

@@ -75,6 +75,9 @@ def consent():
 def measure(response):
     if request.path.startswith(('/admin', '/pedido', '/carrito')) or response.status_code>=400:
         response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    # A cached quote prepared from the cart is not a customer starting checkout.
+    if request.endpoint=='main.checkout' and request.method=='GET' and request.accept_mimetypes.best=='application/json':
+        return response
     events = {'main.home':'visit', 'main.catalog':'catalog', 'main.product_detail':'product', 'main.add_to_cart':'cart', 'main.checkout':'checkout', 'storefront.event':'visit'}
     kind = events.get(request.endpoint)
     if not kind or response.status_code>=400 or session.get('admin_id') or not session.get('analytics_consent') or request.headers.get('DNT')=='1' or request.headers.get('Sec-GPC')=='1':
