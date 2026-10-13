@@ -206,3 +206,26 @@ del pago ni envía mensajes de WhatsApp automáticamente.
 Esta actualización añade `order_fulfillment`: ejecutar `init-db` antes de
 reiniciar; Actions lo hace automáticamente cuando la conexión esté configurada.
 La columna histórica de stock sigue sin limitar compras.
+
+## Personalización ampliada
+
+Administración → Configuración permite subir logo y foto de portada, cambiar
+nombre/frase/ubicación de marca, textos de portada e historia, espaciado, menú
+fijo, estilo de tarjetas, columnas en escritorio y encuadre de fotos. Las
+secciones de categorías, beneficios, preguntas frecuentes e historia se pueden
+ocultar. La portada admite hasta ocho recursos destacados elegidos entre los
+publicados; el catálogo completo conserva todos los productos y sus filtros.
+
+Las imágenes JPG/PNG/WebP se normalizan a JPEG (máximo 5 MB, 20 megapíxeles).
+No se aceptan SVG ni archivos ejecutables desde administración. Logo y foto
+se pueden quitar para volver a la ilustración floral. Configuraciones abiertas
+desde una versión anterior conservan los nuevos ajustes al guardar.
+
+WhatsApp usa el icono de Bootstrap Icons (licencia MIT en
+`app/static/bootstrap-icons-LICENSE.txt`), con texto visible en móvil. Número,
+texto del botón y mensaje inicial son editables. Las fichas preparan una consulta
+con el título del recurso y su URL pública; abrir el enlace no envía el mensaje.
+Las tarjetas permiten agregar directamente al carrito mediante formulario CSRF.
+
+Referencias de navegación y catálogo: Aprendo Jugando y DidacTO3D. No se importan
+sus productos, textos, promociones, opiniones ni datos de clientes.

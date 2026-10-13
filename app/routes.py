@@ -103,9 +103,13 @@ def catalogue_page(is_home):
     sort = request.args.get('orden','recent')
     sorting={'recent':(Product.created_at.desc(),Product.id.desc()),'price_asc':(Product.price_cents.asc(),Product.id.desc()),'price_desc':(Product.price_cents.desc(),Product.id.desc()),'title':(Product.title.asc(),Product.id.asc())}
     if sort not in sorting: sort='recent'
+    from app.studio import settings
+    featured_ids=[int(value) for value in settings()['featured_ids'].split(',') if value.isdigit()]
+    curated=is_home and not (search or category or kind) and bool(featured_ids)
+    if curated: query=query.where(Product.id.in_(featured_ids))
     products, pagination = paginate(query.order_by(*sorting[sort]))
     categories = db().scalars(select(Product.category).where(Product.published.is_(True)).distinct().order_by(Product.category)).all()
-    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination, is_home=is_home, sort=sort)
+    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination, is_home=is_home, sort=sort, curated=curated)
 
 @main.get("/producto/<int:identifier>")
 def product_detail(identifier):
@@ -462,7 +466,13 @@ def save_image(upload):
                 raise ValueError("Usá JPG, PNG o WebP de hasta 20 megapíxeles.")
             picture.thumbnail((1400, 1400))
             filename = f"{secrets.token_hex(16)}.jpg"
-            picture.convert("RGB").save(Path(current_app.config["STORAGE_DIR"])/"images"/filename, "JPEG", quality=85)
+            if picture.mode in ("RGBA","LA") or "transparency" in picture.info:
+                rgba=picture.convert("RGBA")
+                normalized=Image.new("RGB",rgba.size,"white")
+                normalized.paste(rgba,mask=rgba.getchannel("A"))
+            else:
+                normalized=picture.convert("RGB")
+            normalized.save(Path(current_app.config["STORAGE_DIR"])/"images"/filename, "JPEG", quality=85)
             return filename
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as error:
         raise ValueError("El archivo de imagen no es válido.") from error

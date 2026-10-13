@@ -38,6 +38,12 @@
     setTimeout(poll, 8000);
   }
   const quote = document.querySelector('[data-quote-url]');
+  const customization = document.querySelector('[data-customization-form]');
+  customization?.addEventListener('change', () => {
+    const status = customization.querySelector('[data-settings-status]');
+    status.textContent = 'Tenés cambios sin guardar.';
+    status.classList.add('unsaved');
+  });
   quote?.addEventListener('click', async () => {
     const form = quote.closest('form');
     const result = document.querySelector('[data-quote-result]');
