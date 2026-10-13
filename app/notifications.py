@@ -26,6 +26,14 @@ def enqueue_mail(db, order, event):
         body += "Recibimos tu pedido, que queda pendiente de pago.\n"
     body += "\nConsultá los detalles y el estado en tu enlace privado:\n"+link+"\n\nNo compartas este enlace.\nEl Rincón Didáctico"
     db.add(MailOutbox(event_key=event_key, recipient=order.email, subject=subject, body=body))
+    from app.studio import settings
+    owner = settings()['order_email']
+    if owner:
+        owner_key = event_key+":owner"
+        if not db.scalar(select(MailOutbox.id).where(MailOutbox.event_key==owner_key)):
+            detail = "\n".join(f"{item.quantity} × {item.title}" for item in order.items)
+            body = f"Pedido #{order.id} · {'Pago confirmado' if event=='paid' else 'Nuevo pedido'}\nCliente: {order.customer_name}\nCorreo: {order.email}\nTotal ARS: {order.total_cents/100:.2f}\n\n{detail}\n\nAdministrar: {site}/admin/pedidos/{order.id}"
+            db.add(MailOutbox(event_key=owner_key,recipient=owner,subject=subject,body=body))
 
 
 @click.command("send-mail")

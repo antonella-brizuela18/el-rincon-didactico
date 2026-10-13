@@ -34,10 +34,10 @@
     <p class="muted">Los envíos de materiales físicos se coordinan por separado.</p>
     <div class="cart-footer-actions">
       <a class="button" href="{{ url_for('main.checkout') }}">Continuar con mi pedido</a>
-      <a href="{{ url_for('main.home') }}#catalogo">Seguir explorando</a>
+      <a href="{{ url_for('main.catalog') }}">Seguir explorando</a>
     </div>
   {% else %}
-    <div class="empty"><h2>Tu carrito está esperando una idea.</h2><p>Explorá los recursos y agregá los que más te gusten.</p><a class="button" href="{{ url_for('main.home') }}#catalogo">Explorar los recursos</a></div>
+    <div class="empty"><h2>Tu carrito está esperando una idea.</h2><p>Explorá los recursos y agregá los que más te gusten.</p><a class="button" href="{{ url_for('main.catalog') }}">Explorar los recursos</a></div>
   {% endif %}
 </section>
 {% endblock %}

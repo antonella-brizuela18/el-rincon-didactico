@@ -1,15 +1,23 @@
 <!doctype html>
 <html lang="es-AR"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Recursos y materiales didácticos para acompañar el juego y el aprendizaje.">
-<title>{% block title %}El Rincón Didáctico{% endblock %}</title>
+<meta name="description" content="{% block description %}{{ store.seo_description }}{% endblock %}">
+<title>{% block title %}El Rincón Didáctico · Recursos para aprender jugando{% endblock %}</title>
+{% if seo_noindex %}<meta name="robots" content="noindex, follow">{% endif %}
+{% if not private_page and config.SITE_URL %}<link rel="canonical" href="{{ canonical }}"><meta property="og:url" content="{{ canonical }}">{% endif %}
+<meta property="og:title" content="{{ self.title() }}"><meta property="og:description" content="{{ self.description() }}"><meta property="og:type" content="website"><meta property="og:locale" content="es_AR">
+<link rel="icon" href="{{ url_for('static',filename='flower.svg') }}" type="image/svg+xml">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head><body>
+<link rel="stylesheet" href="{{ url_for('static', filename='studio.css') }}">
+{% block head %}{% endblock %}
+</head><body class="theme-{{ store.theme }} {% if is_admin %}admin-shell{% endif %}">
 <a class="skip" href="#contenido">Ir al contenido</a>
-<header class="site-header"><a class="brand" href="{{ url_for('main.home') }}"><span class="brand-mark" aria-hidden="true">✿</span><span>El Rincón<br><strong>Didáctico</strong></span></a>
-<nav aria-label="Navegación principal"><a href="{{ url_for('main.home') }}#catalogo">Recursos</a><a class="cart-link" href="{{ url_for('main.cart') }}">Mi carrito <span>{{ cart_count }}</span></a>
-{% if session.get('admin_id') %}<a href="{{ url_for('main.admin') }}">Administrar</a>{% endif %}</nav></header>
+{% if not is_admin %}<div class="announcement">✿ &nbsp; {{ store.announcement }} &nbsp; ✿</div>{% endif %}
+<header class="site-header"><a class="brand" href="{{ url_for('main.home') }}"><img src="{{ url_for('static',filename='flower.svg') }}" width="46" height="46" alt=""><span>El Rincón<br><strong>Didáctico</strong></span></a>
+<nav aria-label="Navegación principal">{% if is_admin %}<a href="{{ url_for('main.home') }}">Ver mi tienda ↗</a>{% else %}<a href="{{ url_for('main.home') }}" {% if request.endpoint=='main.home' %}aria-current="page"{% endif %}>Inicio</a><a href="{{ url_for('main.catalog') }}" {% if request.endpoint=='main.catalog' %}aria-current="page"{% endif %}>Catálogo</a><a class="cart-link" href="{{ url_for('main.cart') }}">Carrito <span>{{ cart_count }}</span></a>{% endif %}</nav></header>
+{% if is_admin %}<aside class="admin-nav" aria-label="Administración"><p class="eyebrow">Mi espacio</p><nav aria-label="Secciones administrativas"><a href="{{ url_for('main.admin') }}">Resumen y gestión</a><a href="{{ url_for('main.admin') }}#mis-recursos">Recursos</a><a href="{{ url_for('main.admin') }}#mis-pedidos">Pedidos</a><a href="{{ url_for('studio.analytics') }}">Estadísticas</a><a href="{{ url_for('studio.mail') }}">Correos</a><a href="{{ url_for('studio.configuration') }}">Configuración</a></nav><p class="muted">Un pequeño rincón.<br>Muchas posibilidades.</p></aside>{% endif %}
 {% with messages=get_flashed_messages() %}{% if messages %}<div class="flashes" role="status">{% for message in messages %}<p>{{ message }}</p>{% endfor %}</div>{% endif %}{% endwith %}
 <main id="contenido">{% block content %}{% endblock %}</main>
-<footer><a class="brand" href="{{ url_for('main.home') }}">✿ El Rincón Didáctico</a><p>Pequeñas ideas. Grandes descubrimientos.</p><div>{% if config.CONTACT_EMAIL %}<a href="mailto:{{ config.CONTACT_EMAIL }}">Contactanos</a>{% endif %}<a href="{{ url_for('main.login') }}">Acceso de administración</a></div></footer>
+<footer><div><a class="brand" href="{{ url_for('main.home') }}">✿ El Rincón Didáctico</a><p>Ideas pequeñas. Descubrimientos enormes.</p><small>Bahía Blanca, Argentina</small></div><div class="footer-links"><a href="https://www.instagram.com/{{ store.instagram }}/" rel="noopener">Instagram ↗</a>{% if store.contact_email %}<a href="mailto:{{ store.contact_email }}">Contactanos</a>{% endif %}<a href="{{ url_for('studio.privacy') }}">Privacidad</a><a class="admin-access" href="{{ url_for('main.admin') if session.get('admin_id') else url_for('main.login') }}">Administración</a></div></footer>
+{% if not private_page and store.analytics_enabled=='1' and 'analytics_consent' not in session and not session.get('admin_id') %}<details class="privacy-choice"><summary>Privacidad y medición</summary><p>Podés ayudarnos a mejorar con estadísticas de navegación anónimas. No guardamos tu IP ni compartimos esta medición con terceros.</p><form method="post" action="{{ url_for('studio.consent') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small" name="choice" value="yes">Permitir medición</button><button class="text-button" name="choice" value="no">Solo lo necesario</button></form></details>{% endif %}
 </body></html>

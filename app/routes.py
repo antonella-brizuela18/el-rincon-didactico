@@ -82,8 +82,14 @@ def paginate(query, name="pagina", per_page=24):
     return rows, {"total":total, "page":page, "pages":pages}
 
 @main.get("/")
-@main.get("/catalogo")
 def home():
+    return catalogue_page(True)
+
+@main.get("/catalogo")
+def catalog():
+    return catalogue_page(False)
+
+def catalogue_page(is_home):
     query = select(Product).where(Product.published.is_(True))
     search = request.args.get("q", "").strip()[:100]
     category = request.args.get("categoria", "").strip()[:80]
@@ -96,7 +102,7 @@ def home():
         query = query.where(Product.kind==kind)
     products, pagination = paginate(query.order_by(Product.created_at.desc(), Product.id.desc()))
     categories = db().scalars(select(Product.category).where(Product.published.is_(True)).distinct().order_by(Product.category)).all()
-    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination)
+    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination, is_home=is_home)
 
 @main.get("/producto/<int:identifier>")
 def product_detail(identifier):
@@ -126,6 +132,7 @@ def add_to_cart(identifier):
     else:
         cart[str(identifier)] = quantity
         session["cart"] = cart
+        g.analytics_event = "cart"
         session.pop("checkout_key", None)
     return redirect(url_for("main.cart"))
 
@@ -219,6 +226,8 @@ def checkout():
     try:
         db().flush()
         enqueue_mail(db(), order, "created")
+        g.analytics_event = "order"
+        g.analytics_order = order.id
         db().commit()
     except IntegrityError:
         db().rollback()

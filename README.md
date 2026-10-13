@@ -106,3 +106,53 @@ TEST_POSTGRES_URL habilita una prueba que crea y destruye solamente un esquema t
 No se ha conectado el alojamiento ni probado un pago o correo real. Faltan la configuración del sitio, credenciales, cuenta administrativa, cron de correos, respaldos y pruebas integrales desplegadas.
 
 La facturación fiscal, cálculo automático de envíos, cambios/devoluciones, integración de Instagram y notificaciones por WhatsApp no están implementados. Antes de vender, completar los datos del emprendimiento y las condiciones comerciales que correspondan. No hay pedidos ni datos de clientes incluidos en este repositorio.
+
+## Rediseño, administración y medición
+
+La portada `/` y el catálogo `/catalogo` ahora tienen navegación y presentación independientes. El panel conserva recursos y pedidos y añade `/admin/estadisticas`, `/admin/correos` y `/admin/configuracion`. La configuración permite elegir tres paletas, textos de portada, contacto, Instagram, descripción SEO y correo receptor de avisos. No admite HTML/CSS arbitrario.
+
+### Actualizar esta versión en Alwaysdata
+
+```bash
+cd "$HOME/el-rincon-didactico"
+git pull --ff-only origin feat/store-catalog-orders
+source "$HOME/venv/bin/activate"
+python -m pip install -r requirements.txt
+python -m flask --app deploy/wsgi.py init-db
+```
+
+Reiniciar el sitio después de `init-db`: esta versión añade las tablas `store_settings` y `visit_events`, sin alterar ni borrar pedidos/productos existentes. La inicialización es idempotente. No arrancar el código nuevo antes de crear estas tablas.
+
+### Correo real
+
+```bash
+python -m deploy.configure_mail
+```
+
+Ingresar el servidor y credenciales del proveedor de correo. Para un buzón de Alwaysdata, el servidor es `smtp-elrincondidactico.alwaysdata.net`, puerto 465 SSL, usuario = dirección del buzón y contraseña = la del buzón, no la de SSH. También se puede usar otro proveedor SMTP con sus credenciales específicas. El asistente conserva las demás configuraciones, no imprime la contraseña y guarda el archivo privado con permisos 600.
+
+Reiniciar el sitio y completar **Configuración → Recibir avisos de pedidos en**. Se generan avisos para el cliente y para ese destinatario al crear pedidos y al confirmar pagos; no se envían retroactivamente avisos de pedidos anteriores. Los correos al administrador enlazan a la página protegida del pedido, nunca al enlace privado del cliente.
+
+En **Tareas programadas** de Alwaysdata, configurar cada minuto el comando:
+
+```text
+/home/elrincondidactico/venv/bin/python -m flask --app /home/elrincondidactico/el-rincon-didactico/deploy/wsgi.py send-mail
+```
+
+Configurar además una tarea diaria:
+
+```text
+/home/elrincondidactico/venv/bin/python -m flask --app /home/elrincondidactico/el-rincon-didactico/deploy/wsgi.py prune-analytics
+```
+
+Comprobar con un pedido de prueba y verificar recepción en ambas casillas; la etiqueta SMTP configurado solo verifica presencia de parámetros. El centro de correos muestra últimos 100 mensajes, enviados, pendientes y agotados (5 fallos); permite reponer intentos luego de corregir el proveedor. La entrega puede repetirse si el proceso se interrumpe luego de que SMTP acepte el mensaje. No se han probado credenciales reales desde el entorno de desarrollo.
+
+### Qué significan las estadísticas
+
+Medición propia, opt-in: no registra actividad hasta que el visitante permite medir en el selector de privacidad. Respeta DNT y GPC y excluye administradores. Una visita se renueva a los 30 minutos de inactividad; no equivale a una persona única. No almacena IP, user-agent, búsquedas, referrers, URLs privadas ni correo en eventos. Las acciones guardadas son catálogo, producto, agregado correcto al carrito, inicio de checkout y pedido creado. Refrescar no multiplica una misma acción de visita/producto/pedido; el conteo del embudo utiliza visitas distintas.
+
+La conversión usa una cohorte de visitas cuyo primer evento conservado está en el período; cada etapa es el porcentaje de esa cohorte que la alcanzó. No impone secuencia lineal. Los pagos se derivan de pedidos realmente pagados de esa cohorte, incluso si se acreditan después del período; los reembolsados dejan de contar. No se infieren pagos a partir de retornos del navegador. Pedidos totales y cobros son indicadores comerciales independientes e incluyen clientes sin consentimiento. Las fechas de reportes son UTC. La limpieza diaria elimina eventos mayores a 180 días. Sin tráfico permitido, se muestran ceros reales.
+
+### SEO
+
+Descripción editable, metadatos sociales, canonical y descripciones por producto, marcado Product/Offer con precio ARS y disponibilidad real, sitemap dinámico de páginas públicas y robots.txt. Admin, carrito y pedidos incluyen `X-Robots-Tag: noindex`; filtros/búsquedas se marcan noindex para evitar variantes indexadas. No se publican opiniones ni calificaciones inventadas. La versión debe desplegarse antes de probar URLs en Search Console y enviar `/sitemap.xml`; el código no verifica propiedad ni promete posiciones. Se necesita contenido original, imágenes reales y revisión editorial de cada producto.

@@ -82,6 +82,8 @@ def create_app(config=None):
     from app.models import Admin, Base
     from app.routes import main
     app.register_blueprint(main)
+    from app.studio import register
+    register(app)
     @app.errorhandler(CSRFError)
     def csrf_error(error):
         return render_template("message.html", title="Volvé a abrir el formulario", message="No pudimos validar el envío. Recargá la página e intentá otra vez. Si estabas ingresando, abrí nuevamente el acceso de administración."), 400
