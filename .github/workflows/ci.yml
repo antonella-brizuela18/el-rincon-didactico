@@ -29,8 +29,24 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - run: pnpm --dir frontend install --frozen-lockfile
+      - run: pnpm --dir frontend test
+      - run: pnpm --dir frontend build
       - run: node --check app/static/experience.js
-      - run: node --test tests/navigation.test.cjs
+      - name: Stamp frontend revision
+        run: printf '%s\n' "$GITHUB_SHA" > app/static/storefront/.build-revision
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storefront
+          path: app/static/storefront/
+          include-hidden-files: true
+          retention-days: 7
       - run: python -m compileall -q app
       - run: python -m pytest -q
         env:
@@ -54,6 +70,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: storefront
+          path: app/static/storefront/
       - name: Deploy tested commit and verify public version
         env:
           ALWAYS_SSH_KEY: ${{ secrets.ALWAYSDATA_SSH_KEY }}

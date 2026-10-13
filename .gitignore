@@ -12,3 +12,5 @@ __pycache__/
 *.sqlite*
 storage/
 *service-account*.json
+frontend/node_modules/
+app/static/storefront/

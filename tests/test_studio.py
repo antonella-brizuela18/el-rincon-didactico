@@ -10,7 +10,7 @@ def test_navigation_and_seo(client, app):
     home=client.get('/').text
     catalog=client.get('/catalogo').text
     assert '/catalogo#catalogo' not in home+catalog
-    assert 'Ideas que hacen crecer' in home and 'Ideas que hacen crecer' not in catalog
+    assert 'Ideas que hacen crecer' in home and 'Ideas que hacen crecer' not in catalog.split('<main')[1].split('</main>')[0]
     assert 'https://example.test/catalogo' in catalog
     assert 'Borrador' not in client.get('/sitemap.xml').text
     assert '/producto/1' in client.get('/sitemap.xml').text
@@ -91,3 +91,4 @@ def test_failed_cart_not_counted(app,client):
     client.post('/carrito/agregar/2')
     client.post('/carrito/agregar/2')
     with app.extensions['sessions']() as db: assert db.query(VisitEvent).filter_by(kind='cart').count()==1
+

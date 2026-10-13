@@ -12,7 +12,7 @@ def test_bundle_is_fingerprinted_and_private_pages_are_not_cached(app,client):
     assert client.get(path,headers={'If-None-Match':css.headers['ETag']}).status_code==304
     assert client.get('/ui.css').headers['Cache-Control']=='no-cache'
     assert client.get('/carrito').headers['Cache-Control']=='no-store'
-    script=re.search(r'src="([^"]*experience.js[^\"]*)"',html).group(1)
+    script=re.search(r'src="([^"]*(?:storefront/assets/|experience.js)[^\"]*)"',html).group(1)
     assert 'immutable' in client.get(script).headers['Cache-Control']
     assert 'immutable' not in client.get('/static/experience.js?v=invalid').headers['Cache-Control']
 

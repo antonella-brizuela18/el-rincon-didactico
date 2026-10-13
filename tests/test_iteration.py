@@ -13,7 +13,7 @@ def test_public_revision_and_assets_cache_busting(app,client):
     assert result.headers['Cache-Control']=='no-store'
     page=client.get('/')
     assert page.headers['X-App-Revision']=='a'*40
-    assert 'experience.js?v=' in page.text and 'ui.css?v=' in page.text
+    assert ('storefront/assets/' in page.text or 'experience.js?v=' in page.text) and 'ui.css?v=' in page.text
 
 def test_catalogue_sorting(client):
     ascending=client.get('/catalogo?orden=price_asc').text
@@ -70,7 +70,7 @@ def test_deploy_verification_accepts_matching_site_only(monkeypatch):
     health=Mock();health.__enter__=Mock(return_value=health);health.__exit__=Mock(return_value=False)
     health.read=Mock(return_value=json.dumps({'status':'ok','revision':'b'*40}).encode())
     page=Mock();page.__enter__=Mock(return_value=page);page.__exit__=Mock(return_value=False)
-    page.read=Mock(return_value=b'<button class="mode-toggle"></button><script src="experience.js?v=123"></script>')
+    page.read=Mock(return_value=b'<div id="rincon-react"></div><script type="module" src="/static/storefront/assets/main-hash.js"></script>')
     page.headers={'X-App-Revision':'b'*40}
     monkeypatch.setattr('deploy.actions.urlopen',Mock(side_effect=[health,page]))
     assert verify('https://example.test','b'*40,attempts=1,pause=lambda _:None) is True

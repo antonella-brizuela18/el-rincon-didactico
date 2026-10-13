@@ -1,6 +1,7 @@
 """Configuration and secrets stay outside the repository."""
 import os
 import hashlib
+import gzip
 import re
 from datetime import timedelta
 from pathlib import Path
@@ -49,6 +50,7 @@ def create_app(config=None):
     app.config['APP_REVISION']=revision if re.fullmatch(r'[0-9a-f]{40}',revision) else 'development'
     versions={p.relative_to(app.static_folder).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()[:12]
               for p in Path(app.static_folder).rglob('*') if p.is_file()}
+    compressed={name:gzip.compress((Path(app.static_folder)/name).read_bytes(),compresslevel=6,mtime=0) for name in versions if name.endswith(('.js','.css'))}
     @app.url_defaults
     def static_version(endpoint, values):
         if endpoint=='static' and values.get('filename') in versions:
@@ -89,6 +91,19 @@ def create_app(config=None):
             filename=(request.view_args or {}).get('filename')
             if request.args.get('v')==versions.get(filename) and filename in versions:
                 response.headers['Cache-Control']='public, max-age=31536000, immutable'
+        # Compress only public assets; never compress pages containing CSRF/private data.
+        payload=None
+        if request.endpoint=='static': payload=compressed.get((request.view_args or {}).get('filename'))
+        elif request.endpoint=='assets.ui': payload=app.extensions.get('ui_gzip')
+        if payload is not None:
+            response.vary.add('Accept-Encoding')
+            if request.method=='GET' and response.status_code==200 and request.accept_encodings['gzip']>0:
+                if hasattr(response.response,'close'): response.response.close()
+                response.direct_passthrough=False
+                response.set_data(payload)
+                response.headers['Content-Encoding']='gzip'
+                etag,weak=response.get_etag()
+                if etag: response.set_etag(etag,weak=True)
         response.headers["X-App-Revision"] = app.config["APP_REVISION"]
         response.headers["X-Content-Type-Options"] = "nosniff"
         # HTTPS CSRF validation needs a same-origin Referer; external links must not receive private URLs.
@@ -107,6 +122,8 @@ def create_app(config=None):
     register_assets(app)
     from app.studio import register
     register(app)
+    from app.storefront import register as register_storefront
+    register_storefront(app)
     from app.shipping import shipping
     app.register_blueprint(shipping)
     @app.errorhandler(CSRFError)

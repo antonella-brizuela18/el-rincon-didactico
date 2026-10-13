@@ -3,6 +3,9 @@
 Only stdlib is used. Credentials live in the ephemeral runner, never in artifacts.
 """
 import json
+import base64
+import io
+import tarfile
 import os
 from pathlib import Path
 import re
@@ -38,7 +41,7 @@ def verify(url, sha, attempts=24, pause=time.sleep):
                 with urlopen(url+'/',timeout=10) as response:
                     html=response.read().decode()
                     revision=response.headers.get('X-App-Revision')
-                if revision==sha and 'mode-toggle' in html and 'experience.js?v=' in html: return True
+                if revision==sha and 'id="rincon-react"' in html and '/static/storefront/assets/' in html: return True
         except (URLError,ValueError,OSError): pass
         pause(5)
     return False
@@ -52,7 +55,14 @@ def main():
         hosts=directory/'known_hosts';hosts.write_text(config['ALWAYS_KNOWN_HOSTS'].rstrip()+'\n');hosts.chmod(0o600)
         ssh=['ssh','-i',str(key),'-o','IdentitiesOnly=yes','-o','BatchMode=yes','-o','StrictHostKeyChecking=yes',
              '-o','UserKnownHostsFile='+str(hosts),'-o','ConnectTimeout=15',config['ALWAYS_ACCOUNT']+'@'+config['ALWAYS_HOST']]
-        script=Path(__file__).with_name('remote.py').read_text()
+        assets=Path(__file__).resolve().parent.parent/'app/static/storefront'
+        if not (assets/'.vite/manifest.json').is_file(): raise ValueError('Falta el frontend compilado y probado.')
+        bundle=io.BytesIO()
+        with tarfile.open(fileobj=bundle,mode='w:gz') as archive:
+            for asset in sorted(assets.rglob('*')):
+                if asset.is_file(): archive.add(asset,arcname=asset.relative_to(assets).as_posix())
+        encoded=base64.b64encode(bundle.getvalue()).decode('ascii')
+        script='FRONTEND_BUNDLE = '+repr(encoded)+'\n'+Path(__file__).with_name('remote.py').read_text()
         command=shlex.join([config['ALWAYS_PYTHON'],'-',sha,config['ALWAYS_PROJECT']])
         subprocess.run(ssh+[command],input=script,text=True,check=True,timeout=600)
         # remote.py updates the file monitored by uWSGI touch-reload.
