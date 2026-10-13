@@ -1,43 +1,6 @@
-{% extends "base.html" %}
-{% block title %}Mi carrito · El Rincón Didáctico{% endblock %}
-{% block content %}
-<section class="section narrow">
-  <p class="eyebrow">Tu próxima aventura</p>
-  <h1 class="page-title">Mi carrito</h1>
-  {% if rows %}
-    {% for product,quantity in rows %}
-    <div class="cart-row">
-      <div class="cart-item-copy">
-        <a href="{{ url_for('main.product_detail', identifier=product.id) }}"><strong>{{ product.title }}</strong></a>
-        <p>{{ product.price_cents|money }} por unidad · {{ 'Digital' if product.kind=='digital' else 'Físico' }}</p>
-        {% if product.kind=='physical' %}
-        <form class="quantity-form" method="post" action="{{ url_for('main.update_cart_quantity', identifier=product.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label for="quantity-{{ product.id }}">Cantidad de {{ product.title }}</label>
-          <div class="quantity-controls">
-            <input id="quantity-{{ product.id }}" name="quantity" type="number" min="1" max="10" value="{{ quantity }}" required>
-            <button class="text-button">Actualizar</button>
-          </div>
-        </form>
-        {% else %}<p class="muted">Una descarga, para usar tu recurso las veces que quieras.</p>{% endif %}
-      </div>
-      <div class="cart-item-actions">
-        <strong>{{ (product.price_cents*quantity)|money }}</strong>
-        <form method="post" action="{{ url_for('main.remove_from_cart', identifier=product.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="text-button" aria-label="Quitar {{ product.title }} del carrito">Quitar</button>
-        </form>
-      </div>
-    </div>
-    {% endfor %}
-    <div class="total"><span>Total de productos</span><strong>{{ total|money }}</strong></div>
-    <p class="muted">Los envíos de materiales físicos se coordinan por separado.</p>
-    <div class="cart-footer-actions">
-      <a class="button" href="{{ url_for('main.checkout') }}">Continuar con mi pedido</a>
-      <a href="{{ url_for('main.catalog') }}">Seguir explorando</a>
-    </div>
-  {% else %}
-    <div class="empty"><h2>Tu carrito está esperando una idea.</h2><p>Explorá los recursos y agregá los que más te gusten.</p><a class="button" href="{{ url_for('main.catalog') }}">Explorar los recursos</a></div>
-  {% endif %}
-</section>
-{% endblock %}
+{% extends 'base.html' %}{% from '_purchase_steps.html' import purchase_steps %}
+{% block title %}Tu carrito · El Rincón Didáctico{% endblock %}
+{% block content %}<section class="section shopping-section">{{ purchase_steps(1) }}<div class="section-heading"><div><p class="eyebrow">Tus próximas ideas</p><h1 class="page-title">Tu carrito</h1></div><a href="{{ url_for('main.catalog') }}">← Seguir comprando</a></div>
+{% if rows %}<div class="shopping-layout"><div class="cart-items">{% for product,quantity in rows %}<article class="cart-row"><a class="cart-thumbnail" href="{{ url_for('main.product_detail',identifier=product.id) }}">{% if product.image %}<img src="{{ url_for('main.image',filename=product.image) }}" alt="{{ product.title }}" width="96" height="96">{% else %}<span aria-hidden="true">✿</span>{% endif %}</a><div class="cart-item-copy"><a href="{{ url_for('main.product_detail',identifier=product.id) }}"><strong>{{ product.title }}</strong></a><p>{{ 'Archivo digital' if product.kind=='digital' else 'Material físico por encargo' }} · {{ product.price_cents|money }} por unidad</p>{% if product.kind=='physical' %}<form class="quantity-form" method="post" action="{{ url_for('main.update_cart_quantity',identifier=product.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label for="quantity-{{ product.id }}">Cantidad</label><div class="quantity-controls"><input id="quantity-{{ product.id }}" name="quantity" type="number" min="1" max="10" value="{{ quantity }}" required><button class="text-button">Actualizar</button></div></form>{% else %}<p class="muted">Descargás después de confirmar el pago.</p>{% endif %}</div><div class="cart-item-actions"><strong>{{ (product.price_cents*quantity)|money }}</strong><form method="post" action="{{ url_for('main.remove_from_cart',identifier=product.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button" aria-label="Quitar {{ product.title }} del carrito">Quitar</button></form></div></article>{% endfor %}</div>
+<aside class="order-summary"><p class="eyebrow">Todo a la vista</p><h2>Resumen del pedido</h2><div class="summary-line"><span>{{ cart_count }} {{ 'recurso' if cart_count==1 else 'unidades' }}</span><strong>{{ total|money }}</strong></div><div class="summary-line"><span>Envío</span><strong>{{ 'A coordinar' if rows|selectattr('0.kind','equalto','physical')|list else 'Digital · sin envío' }}</strong></div><div class="total"><span>Total de productos</span><strong>{{ total|money }}</strong></div>{% if rows|selectattr('0.kind','equalto','physical')|list %}<p class="muted">{{ store.delivery_note }} Preparación: aprox. {{ store.preparation_days }} días desde el pago.</p>{% endif %}<a class="button" href="{{ url_for('main.checkout') }}">Continuar con la compra →</a><p class="purchase-help">A continuación completás tus datos y elegís el medio de pago. Todavía no se realiza ningún cobro.</p></aside></div>
+{% else %}<div class="empty"><span aria-hidden="true">✿</span><h2>Encontrá tu próxima idea.</h2><p>Tu carrito está vacío. Descubrí materiales para jugar, crear y aprender.</p><a class="button" href="{{ url_for('main.catalog') }}">Ver catálogo</a></div>{% endif %}</section>{% endblock %}

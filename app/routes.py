@@ -15,9 +15,9 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
-from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, Parcel, Product, Fulfillment, now
+from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, Parcel, Product, Fulfillment, OrderPayment, now
 from app import csrf
-from app.payments import PaymentError, mp_configured, mp_request, valid_signature
+from app.payments import PaymentError, mp_configured, mp_ready, payment_methods, mp_request, valid_signature
 from app.notifications import enqueue_mail
 from app import drive
 main = Blueprint("main", __name__)
@@ -138,6 +138,9 @@ def add_to_cart(identifier):
     session["cart"] = cart
     g.analytics_event = "cart"
     session.pop("checkout_key", None)
+    flash("Listo: tu recurso se agregó al carrito. Revisá tu selección para continuar.")
+    if request.form.get('intent')=='buy_now':
+        return redirect(url_for('main.checkout'))
     return redirect(url_for("main.cart"))
 
 @main.post("/carrito/quitar/<int:identifier>")
@@ -182,13 +185,17 @@ def update_cart_quantity(identifier):
 
 @main.route("/pedido/nuevo", methods=["GET", "POST"])
 def checkout():
-    if not current_app.config["PAYMENT_INSTRUCTIONS"] and not mp_configured():
+    from app.studio import settings
+    options=settings()
+    if options["checkout_enabled"]!="1" or not payment_methods():
         return render_template("message.html", title="Estamos preparando las compras", message="Los recursos se pueden explorar. Pronto habilitaremos los pedidos."), 503
     if request.method=="GET":
         session.setdefault("checkout_key", secrets.token_hex(24))
         rows = cart_rows()
         if not rows:
             return redirect(url_for("main.cart"))
+        if not payment_methods(any(p.kind=='physical' for p,q in rows)):
+            return render_template('message.html', title='Consultanos por este pedido', message='Todavía no hay un medio de pago habilitado para estos materiales. Contactanos para coordinar.'),503
         session["checkout_quote"] = {str(p.id):[p.price_cents,q] for p,q in rows}
         return render_template("checkout.html", rows=rows, total=sum(p.price_cents*q for p,q in rows), checkout_key=session["checkout_key"])
     key = request.form.get("checkout_key", "")
@@ -212,9 +219,11 @@ def checkout():
         db().rollback()
         flash("Un precio cambió. Revisá el total actualizado antes de confirmar.")
         return redirect(url_for("main.checkout"))
-    if any(p.kind=="physical" for p,q in rows) and not current_app.config["PAYMENT_INSTRUCTIONS"]:
+    methods=payment_methods(any(p.kind=='physical' for p,q in rows))
+    selected=request.form.get('payment_method') or (methods[0][0] if methods else '')
+    if not methods or selected not in [method[0] for method in methods]:
         db().rollback()
-        flash("Las compras de materiales físicos todavía no están habilitadas.")
+        flash("Elegí un medio de pago habilitado para este pedido.")
         return redirect(url_for("main.cart"))
     whatsapp = re.sub(r"[\s()+-]", "", request.form.get("whatsapp", ""))
     postal = request.form.get("postal_code", "").strip().upper()
@@ -229,6 +238,8 @@ def checkout():
     try:
         db().flush()
         db().add(OrderContact(order_id=order.id, whatsapp=whatsapp, postal_code=postal))
+        delivery = (f"Preparación aproximada: {options['preparation_days']} días desde el pago. {options['delivery_note']}" if physical else 'Descarga privada disponible durante 7 días desde la acreditación.')
+        db().add(OrderPayment(order_id=order.id,method=selected,instructions=options['payment_instructions'] if selected=='transfer' else '',delivery_note=delivery))
         db().flush()
         enqueue_mail(db(), order, "created")
         g.analytics_event = "order"
@@ -245,7 +256,7 @@ def checkout():
 @main.get("/pedido/<token>")
 def order_detail(token):
     order = customer_order(token)
-    return render_template("order.html", order=order, token=token, fulfillment=db().get(Fulfillment,order.id), can_download=order.status=="paid" and bool(order.paid_at) and order.paid_at>=now()-timedelta(days=7))
+    return render_template("order.html", order=order, token=token, fulfillment=db().get(Fulfillment,order.id), payment_terms=db().get(OrderPayment,order.id), can_download=order.status=="paid" and bool(order.paid_at) and order.paid_at>=now()-timedelta(days=7))
 
 @main.get("/pedido/<token>/estado")
 def order_status(token):
@@ -269,7 +280,8 @@ def download(token, item_id):
 @main.post("/pedido/<token>/pagar")
 def pay_with_mp(token):
     order = customer_order(token)
-    if not mp_configured() or order.status!="pending" or any(item.kind=="physical" for item in order.items):
+    terms=db().get(OrderPayment,order.id)
+    if not mp_ready() or (terms and terms.method!='mp') or order.status!="pending" or any(item.kind=="physical" for item in order.items):
         abort(409)
     order = db().scalar(select(Order).where(Order.id==order.id).with_for_update().execution_options(populate_existing=True))
     if order.status!="pending":
@@ -302,7 +314,7 @@ def pay_with_mp(token):
 @main.post("/pagos/mercadopago/webhook")
 @csrf.exempt
 def mp_webhook():
-    if not mp_configured():
+    if not mp_ready():
         abort(503)
     payment_id = request.args.get("data.id", "")
     if not valid_signature(payment_id, request.headers.get("x-request-id", ""), request.headers.get("x-signature", "")):
@@ -314,6 +326,9 @@ def mp_webhook():
     order = db().scalar(select(Order).where(Order.checkout_key==payment.get("external_reference", "")).with_for_update())
     if not order:
         return jsonify(status="ignored")
+    terms=db().get(OrderPayment,order.id)
+    if terms and terms.method!="mp":
+        return jsonify(status="payment-method-review-required")
     try:
         amount = Decimal(str(payment.get("transaction_amount")))
         correct_amount = amount.is_finite() and amount==Decimal(order.total_cents)/100
@@ -576,7 +591,7 @@ def admin_order(identifier):
     order = db().get(Order, identifier)
     if not order:
         abort(404)
-    return render_template("admin_order.html", order=order, contact=db().get(OrderContact, order.id), fulfillment=db().get(Fulfillment,order.id))
+    return render_template("admin_order.html", order=order, contact=db().get(OrderContact, order.id), fulfillment=db().get(Fulfillment,order.id), payment_terms=db().get(OrderPayment,order.id))
 
 @main.post('/admin/pedidos/<int:identifier>/preparacion')
 @admin_required
@@ -636,3 +651,4 @@ def readiness():
 @main.app_errorhandler(413)
 def too_large(error):
     return render_template("message.html", title="El archivo es demasiado grande", message="El formulario admite hasta 20 MB en total."), 413
+
