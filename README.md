@@ -20,6 +20,18 @@ No incluye productos ficticios ni credenciales preconfiguradas. La cuenta admini
 
 ## Preparación en Alwaysdata
 
+### Asistente por SSH (alternativa recomendada para esta primera instalación)
+
+Instalar esta rama en una carpeta nueva, por ejemplo ~/apps/el-rincon-didactico. Usar PYTHON_VERSION=3.12 python -m venv .venv, activar el virtualenv e instalar requirements.txt. Alwaysdata utiliza el comando python, no python3.
+
+Desde la raíz del proyecto ejecutar python -m deploy.configure. El asistente pide la URL HTTPS y los datos de PostgreSQL, codifica los caracteres especiales de la contraseña y genera una clave de sesión. Guarda settings.json con permisos 600 en ~/.config/el-rincon-didactico/, fuera del repositorio. Al repetirlo conserva la clave de sesión y puede conservar la conexión existente.
+
+Ejecutar python -m flask --app deploy/wsgi.py init-db y python -m flask --app deploy/wsgi.py create-admin. Para esta alternativa el sitio debe apuntar al archivo deploy/wsgi.py, con el checkout como working directory y su .venv como virtualenv. Ese WSGI carga la misma configuración privada que los comandos de consola.
+
+Para editar después pagos o correo usar un editor local sobre ~/.config/el-rincon-didactico/settings.json. No compartir ese archivo. La tarea de correos debe ejecutar python -m flask --app deploy/wsgi.py send-mail desde el proyecto y con el virtualenv correspondiente. No apuntar la URL del sitio a la carpeta privada de configuración.
+
+### Configuración directa por variables de entorno
+
 1. Confirmar dónde está el checkout existente. El despliegue original documenta:
    - Python WSGI: /home/elrincondidactico/wsgi.py
    - Working directory: /home/elrincondidactico/

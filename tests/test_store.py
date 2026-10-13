@@ -124,7 +124,11 @@ def test_checkout_price_is_server_owned_and_retries_do_not_duplicate(app, client
     assert order.total_cents == 123456
     assert order.status == "pending"
     second = client.post("/pedido/nuevo", data={"checkout_key":key, "name":"Changed", "email":"changed@example.test"})
-    assert second.location == response.location
+    # Signed URLs can differ when retries fall in another second; the order identity must match.
+    from app.routes import signer
+    with app.app_context():
+        assert signer().loads(second.location.rsplit("/", 1)[1]) == key
+    assert client.get(second.location).status_code == 200
     with app.extensions["sessions"]() as db:
         assert db.query(Order).count() == 1
 
