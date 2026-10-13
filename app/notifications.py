@@ -21,7 +21,11 @@ def enqueue_mail(db, order, event):
     subject = f"El Rincón Didáctico · Pedido #{order.id}"
     body = f"Hola, {order.customer_name}.\n\n"
     if event=="paid":
-        body += "Confirmamos tu pago. Tus archivos digitales están disponibles durante 7 días desde la acreditación.\n"
+        body += "Confirmamos tu pago.\n"
+        if any(item.kind=="digital" for item in order.items):
+            body += "Tus archivos digitales ya están habilitados en el enlace privado, durante 7 días desde la acreditación.\n"
+        if any(item.kind=="physical" for item in order.items):
+            body += "Tus materiales se preparan a pedido en aproximadamente 10 días, más el tránsito del correo. Coordinaremos la entrega por WhatsApp.\n"
     else:
         body += "Recibimos tu pedido, que queda pendiente de pago.\n"
     body += "\nConsultá los detalles y el estado en tu enlace privado:\n"+link+"\n\nNo compartas este enlace.\nEl Rincón Didáctico"

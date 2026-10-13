@@ -18,7 +18,8 @@ def test_setup_encodes_password_and_keeps_secrets_private(tmp_path, monkeypatch)
     values = json.loads(path.read_text())
     assert make_url(values["DATABASE_URL"]).password=="test@password:/#"
     assert values["TRUSTED_HOSTS"]=="store.example.test"
-    assert path.stat().st_mode & 0o777 == 0o600
+    if __import__("os").name != "nt":  # POSIX modes are not Windows ACLs.
+        assert path.stat().st_mode & 0o777 == 0o600
     secret = values["SECRET_KEY"]
     answers = iter(["", "s", "", ""])
     monkeypatch.setattr("builtins.input", lambda label:next(answers))

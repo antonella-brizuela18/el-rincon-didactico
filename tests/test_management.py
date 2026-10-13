@@ -49,7 +49,7 @@ def test_quantity_limits_and_checkout_invalidation(client):
     with client.session_transaction() as state:
         assert state["cart"]["2"]==2
         assert "checkout_key" not in state
-    for quantity in ("0","-1","3","100"):
+    for quantity in ("0","-1","11","100"):
         client.post("/carrito/cantidad/2", data={"quantity":quantity})
         with client.session_transaction() as state:
             assert state["cart"]["2"]==2
@@ -60,7 +60,7 @@ def test_quantity_limits_and_checkout_invalidation(client):
         assert state["cart"]["1"]==1
 
 
-def test_cart_reconciles_hidden_and_out_of_stock_products(app, client):
+def test_cart_removes_hidden_but_keeps_made_to_order_products(app, client):
     client.post("/carrito/agregar/1")
     client.post("/carrito/agregar/2")
     client.get("/pedido/nuevo")
@@ -72,7 +72,7 @@ def test_cart_reconciles_hidden_and_out_of_stock_products(app, client):
     assert page.status_code==200
     assert b"Actualizamos tu carrito" in page.data
     with client.session_transaction() as state:
-        assert state["cart"]=={}
+        assert state["cart"]=={"2":1}
         assert "checkout_key" not in state
 
 

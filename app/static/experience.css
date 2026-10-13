@@ -1,0 +1,35 @@
+/* Locally available typography; no font tracking or third-party requests. */
+:root{--surface:#fffdf9;--brand-accent:#345b32}
+body{font-family:'Segoe UI',system-ui,sans-serif;font-size:16px;line-height:1.65}
+body.font-editorial h1,body.font-editorial h2{font-family:'Palatino Linotype','Book Antiqua',Palatino,serif;font-weight:500;letter-spacing:-.045em}
+body.font-rounded{font-family:'Century Gothic','Segoe UI',sans-serif}
+body.font-classic h1,body.font-classic h2{font-family:Georgia,'Times New Roman',serif;font-weight:400}
+.hero h1{line-height:1.04}.hero .intro{font-size:1.12rem;max-width:36rem}.hero-note{font-size:.85rem}
+.button{background:var(--brand-accent);border-color:var(--brand-accent);color:var(--accent-ink,#fff)}
+.secondary-button{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.button:hover{background:var(--brand-accent);border-color:var(--brand-accent);color:var(--accent-ink,#fff);filter:brightness(.93)}
+.mode-toggle{display:inline-flex;align-items:center;gap:6px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:30px;padding:8px 12px;font:inherit;font-size:.8rem;cursor:pointer}
+.social-icon{width:22px;height:22px;vertical-align:middle;margin-right:5px}
+.promotion{max-width:1144px;margin:24px auto 0;padding:28px 36px;display:flex;align-items:center;justify-content:space-between;gap:24px;border:1px solid var(--line);border-radius:18px;background:var(--mint)}
+.promotion h2{font-size:1.8rem;margin:0}.promotion p{margin:6px 0}.promotion .button{flex-shrink:0}
+.whatsapp-float{position:fixed;right:24px;bottom:24px;z-index:30;display:flex;align-items:center;gap:9px;background:#176b43;color:#fff;border:1px solid #ffffff60;border-radius:999px;padding:13px 20px;text-decoration:none;box-shadow:0 6px 28px #0003;font-size:.85rem;font-weight:600}
+.whatsapp-float svg{width:29px;height:29px}.whatsapp-float:hover{background:#115233;color:white}
+.privacy-choice{position:fixed;bottom:20px;left:20px;z-index:40;width:min(540px,calc(100% - 40px));max-height:75vh;overflow:auto;background:var(--surface);border:1px solid var(--line);box-shadow:0 12px 65px #0003;padding:24px;margin:0;font-size:.9rem}
+.privacy-choice h2{font-size:1.5rem;margin:0}.privacy-choice form{gap:12px;align-items:center}.privacy-choice form>a{width:100%}
+body:has(.privacy-choice) .whatsapp-float{bottom:auto;top:110px}
+.shipping-quote{padding:20px;border:1px solid var(--line);border-radius:12px}.shipping-quote [role=status]{white-space:pre-line}
+:focus-visible{outline:3px solid var(--brand-accent);outline-offset:4px}
+body[data-mode=dark]{color-scheme:dark;--ink:#f5eaf0;--muted:#c6bdc6;--cream:#1d1b20;--white:#28242c;--surface:#28242c;--line:#554b57;--rose:#4b3343;--mint:#303f2c;--lilac:#40354c;--green:#bcdfaa;background:var(--cream);color:var(--ink)}
+body[data-mode=dark] :is(.site-header,.filters,.product-card,.panel,fieldset,.login-box,.admin-stats div,.admin-shell .filters,input,select,textarea,.cart-link,.table-wrap){background:var(--surface);color:var(--ink)}
+body[data-mode=dark] :is(.announcement,.story,.catalog-intro,.detail-image,.product-image,.product-card:nth-child(3n+2) .product-image,.product-card:nth-child(3n+3) .product-image){background:var(--rose);color:var(--ink)}
+body[data-mode=dark] :is(.notice,.flashes,.empty,.admin-stats div:first-child,th,footer,.badge){background:var(--mint);color:var(--ink)}
+body[data-mode=dark] .admin-nav{background:#17151a}body[data-mode=dark] .learning-card{color:#352b33}
+body[data-mode=dark] .button{color:#fff}body[data-mode=dark] a:hover{color:#e7f5db}body[data-mode=dark] :is(.pagination a,.drive-item,.status-pill){background:var(--surface);color:var(--ink)}body[data-mode=dark] .secondary-button{color:var(--ink)}
+body[data-mode=dark] .board-tag,body[data-mode=dark] .board-sticker{color:var(--ink)}
+body[data-mode=dark] .button:not(.secondary-button){color:var(--accent-ink,#fff)}
+body[data-mode=dark] .secondary-button:hover{background:var(--surface);color:var(--ink)}
+body[data-mode=dark] .cart-link span{color:#182018}
+body[data-mode=dark] .learning-card .eyebrow{color:#67465e}
+footer>div:first-child{display:block}footer>div:first-child p{margin:.8rem 0}
+@media(max-width:700px){.promotion{margin:18px 20px;display:block;padding:24px}.promotion .button{margin-top:15px}.whatsapp-float{right:16px;bottom:16px;padding:12px}.whatsapp-float span{display:none}.mode-toggle{padding:8px}.mode-toggle span{display:none}.site-header{gap:15px;flex-wrap:wrap}.privacy-choice{padding:20px}.hero h1{font-size:clamp(2.6rem,11vw,3.7rem)}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}

@@ -48,7 +48,7 @@ def place_order(client, product=1):
     client.get("/pedido/nuevo")
     with client.session_transaction() as state:
         key = state["checkout_key"]
-    response = client.post("/pedido/nuevo", data={"checkout_key":key, "name":"Cliente Test", "email":"client@example.test", "price": "1"})
+    response = client.post("/pedido/nuevo", data={"checkout_key":key, "name":"Cliente Test", "email":"client@example.test", "price": "1", "whatsapp":"+5492915090223"})
     return response, key
 
 
@@ -106,12 +106,12 @@ def test_csrf_required(app, client):
     assert client.post("/admin/login", data={"email":"admin@example.test", "password":"test-password-123", "csrf_token":token}).status_code == 302
 
 
-def test_cart_digital_quantity_and_physical_stock(client):
+def test_cart_digital_quantity_and_physical_made_to_order(client):
     for unused in range(3):
         client.post("/carrito/agregar/1")
         client.post("/carrito/agregar/2")
     with client.session_transaction() as state:
-        assert state["cart"] == {"1":1, "2":2}
+        assert state["cart"] == {"1":1, "2":3}
     client.post("/carrito/quitar/1")
     assert b"Imprimible de colores" not in client.get("/carrito").data
 
@@ -177,11 +177,11 @@ def test_download_payment_gate_and_token_isolation(app, client):
     assert client.get(download).status_code == 403
 
 
-def test_stock_reservation_and_cancellation_exactly_once(app, client):
+def test_made_to_order_cancellation_exactly_once(app, client):
     response, unused = place_order(client, product=2)
     order = latest_order(app)
     with app.extensions["sessions"]() as db:
-        assert db.get(Product, 2).stock == 1
+        assert db.get(Product, 2).stock == 2
     login(client)
     assert client.post(f"/admin/pedidos/{order.id}/cancelar").status_code == 302
     assert client.post(f"/admin/pedidos/{order.id}/cancelar").status_code == 409

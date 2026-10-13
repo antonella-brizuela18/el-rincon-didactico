@@ -31,7 +31,7 @@
       <tr>
         <td><div class="admin-product-label">{% if product.image %}<img class="admin-thumbnail" src="{{ url_for('main.image', filename=product.image) }}" alt="" width="48" height="48">{% endif %}<div><strong>{{ product.title }}</strong><small>{{ product.category }} · {{ 'Digital' if product.kind=='digital' else 'Físico' }}</small></div></div></td>
         <td>{{ product.price_cents|money }}</td>
-        <td>{{ 'Descargable' if product.kind=='digital' else product.stock|string+' unidades' }}</td>
+        <td>{{ 'Descargable' if product.kind=='digital' else 'Hecho a pedido' }}</td>
         <td><span class="status-pill {{ 'status-published' if product.published else 'status-draft' }}">{{ 'Publicado' if product.published else 'Borrador' }}</span></td>
         <td><div class="row-actions">
           <a href="{{ url_for('main.edit_product', identifier=product.id) }}">Editar</a>

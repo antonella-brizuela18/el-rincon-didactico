@@ -15,7 +15,7 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
-from app.models import Admin, LoginAttempt, Order, OrderItem, Product, now
+from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, Parcel, Product, now
 from app import csrf
 from app.payments import PaymentError, mp_configured, mp_request, valid_signature
 from app.notifications import enqueue_mail
@@ -127,13 +127,10 @@ def add_to_cart(identifier):
         flash("El carrito admite hasta 20 recursos diferentes.")
         return redirect(url_for("main.cart"))
     quantity = 1 if product.kind=="digital" else min(cart.get(str(identifier), 0)+1, 10)
-    if product.kind=="physical" and quantity>product.stock:
-        flash("No hay más unidades disponibles.")
-    else:
-        cart[str(identifier)] = quantity
-        session["cart"] = cart
-        g.analytics_event = "cart"
-        session.pop("checkout_key", None)
+    cart[str(identifier)] = quantity
+    session["cart"] = cart
+    g.analytics_event = "cart"
+    session.pop("checkout_key", None)
     return redirect(url_for("main.cart"))
 
 @main.post("/carrito/quitar/<int:identifier>")
@@ -148,7 +145,7 @@ def remove_from_cart(identifier):
 def cart():
     rows = cart_rows()
     current = session.get("cart", {})
-    refreshed = {str(p.id):min(q, p.stock, 10) if p.kind=="physical" else 1 for p,q in rows if p.kind=="digital" or p.stock>0}
+    refreshed = {str(p.id):min(q, 10) if p.kind=="physical" else 1 for p,q in rows}
     if current != refreshed:
         session["cart"] = refreshed
         session.pop("checkout_key", None)
@@ -167,9 +164,9 @@ def update_cart_quantity(identifier):
         quantity = int(request.form.get("quantity", ""))
     except ValueError:
         abort(400)
-    limit = min(10, product.stock) if product.kind=="physical" else 1
+    limit = 10 if product.kind=="physical" else 1
     if not 1 <= quantity <= limit:
-        flash("La cantidad debe respetar el stock disponible; los recursos digitales se compran una sola vez.")
+        flash("Podés pedir entre 1 y 10 unidades; los recursos digitales se compran una sola vez.")
     else:
         cart[str(identifier)] = quantity
         session["cart"] = cart
@@ -204,11 +201,6 @@ def checkout():
         db().rollback()
         flash("El catálogo cambió. Revisá el carrito antes de continuar.")
         return redirect(url_for("main.cart"))
-    for product, quantity in rows:
-        if product.kind=="physical" and product.stock<quantity:
-            db().rollback()
-            flash("Un material se quedó sin stock. Revisá el carrito.")
-            return redirect(url_for("main.cart"))
     if session.get("checkout_quote") != {str(p.id):[p.price_cents,q] for p,q in rows}:
         db().rollback()
         flash("Un precio cambió. Revisá el total actualizado antes de confirmar.")
@@ -217,13 +209,19 @@ def checkout():
         db().rollback()
         flash("Las compras de materiales físicos todavía no están habilitadas.")
         return redirect(url_for("main.cart"))
+    whatsapp = re.sub(r"[\s()+-]", "", request.form.get("whatsapp", ""))
+    postal = request.form.get("postal_code", "").strip().upper()
+    physical = any(p.kind=="physical" for p,q in rows)
+    if (physical and not whatsapp) or (whatsapp and not re.fullmatch(r"[1-9][0-9]{9,14}", whatsapp)) or (postal and not re.fullmatch(r"(?:[0-9]{4}|[A-Z][0-9]{4}[A-Z]{3})", postal)):
+        flash("Ingresá un WhatsApp con código de país (ej. +5492915090223) y un código postal válido.")
+        return redirect(url_for("main.checkout"))
     order = Order(checkout_key=key, customer_name=name, email=email, notes=notes, total_cents=sum(p.price_cents*q for p,q in rows))
     for product, quantity in rows:
         order.items.append(OrderItem(product_id=product.id, title=product.title, kind=product.kind, unit_cents=product.price_cents, quantity=quantity, digital_file=product.digital_file))
-        if product.kind=="physical":
-            product.stock -= quantity
     db().add(order)
     try:
+        db().flush()
+        db().add(OrderContact(order_id=order.id, whatsapp=whatsapp, postal_code=postal))
         db().flush()
         enqueue_mail(db(), order, "created")
         g.analytics_event = "order"
@@ -241,6 +239,12 @@ def checkout():
 def order_detail(token):
     order = customer_order(token)
     return render_template("order.html", order=order, token=token, can_download=order.status=="paid" and bool(order.paid_at) and order.paid_at>=now()-timedelta(days=7))
+
+@main.get("/pedido/<token>/estado")
+def order_status(token):
+    response = jsonify(status=customer_order(token).status)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 @main.get("/pedido/<token>/descarga/<int:item_id>")
 def download(token, item_id):
@@ -501,7 +505,7 @@ def edit_product(identifier=None):
             category = request.form.get("category", "").strip()
             kind = request.form.get("kind", "digital")
             price = Decimal(request.form.get("price", "").replace(",", "."))
-            stock = int(request.form.get("stock", "0") or "0")
+            stock = product.stock or 0
             if not title or len(title)>160 or not description or len(description)>10000 or not category or len(category)>80:
                 raise ValueError("Completá título, descripción y categoría dentro de los límites indicados.")
             if kind not in ("digital", "physical") or not price.is_finite() or price<=0 or price>Decimal("9999999.99") or price.as_tuple().exponent < -2 or not 0<=stock<=100000:
@@ -529,13 +533,26 @@ def edit_product(identifier=None):
             if product.published and kind=="digital" and (not product.digital_file or not (Path(current_app.config["STORAGE_DIR"])/"private"/product.digital_file).is_file()):
                 raise ValueError("Adjuntá el recurso digital antes de publicarlo.")
             db().add(product)
+            db().flush()
+            dimensions = [request.form.get(k, "").strip() for k in ("weight", "height", "width", "length")]
+            if kind == "physical" and any(dimensions):
+                try:
+                    weight, height, width, length = map(int, dimensions)
+                    if not (1 <= weight <= 25000 and all(1 <= n <= 150 for n in (height,width,length))):
+                        raise ValueError()
+                except ValueError:
+                    raise ValueError("Completá peso (1–25000 g) y las tres medidas (1–150 cm) del paquete.")
+                db().merge(Parcel(product_id=product.id, weight=weight, height=height, width=width, length=length))
+            elif kind == "physical":
+                parcel = db().get(Parcel, product.id)
+                if parcel: db().delete(parcel)
             db().commit()
             flash("Recurso guardado.")
             return redirect(url_for("main.admin"))
         except (ValueError, InvalidOperation, drive.DriveError) as error:
             db().rollback()
             flash(str(error) if isinstance(error, (ValueError,drive.DriveError)) else "Ingresá un precio válido.")
-    return render_template("edit_product.html", product=product, drive_file_id=drive_file_id,
+    return render_template("edit_product.html", product=product, parcel=db().get(Parcel, product.id) if product.id else None, drive_file_id=drive_file_id,
                            drive_image_id=drive_image_id, selected_file=selected_file, selected_image=selected_image)
 
 @main.get("/admin/pedidos/<int:identifier>")
@@ -544,7 +561,7 @@ def admin_order(identifier):
     order = db().get(Order, identifier)
     if not order:
         abort(404)
-    return render_template("admin_order.html", order=order)
+    return render_template("admin_order.html", order=order, contact=db().get(OrderContact, order.id))
 
 @main.post("/admin/pedidos/<int:identifier>/<action>")
 @admin_required
@@ -561,11 +578,6 @@ def order_action(identifier, action):
         order.payment_reference, order.confirmed_by = reference, session["admin_id"]
         enqueue_mail(db(), order, "paid")
     elif action=="cancelar" and order.status=="pending":
-        for item in sorted(order.items, key=lambda item:item.product_id):
-            if item.kind=="physical":
-                product = db().scalar(select(Product).where(Product.id==item.product_id).with_for_update())
-                if product:
-                    product.stock += item.quantity
         order.status = "cancelled"
     else:
         abort(409)

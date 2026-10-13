@@ -28,6 +28,10 @@ def create_app(config=None):
         MP_WEBHOOK_SECRET=os.environ.get("MP_WEBHOOK_SECRET", ""),
         MP_COLLECTOR_ID=os.environ.get("MP_COLLECTOR_ID", ""),
         MP_LIVE_MODE=os.environ.get("MP_LIVE_MODE", "0")=="1",
+        MICORREO_USER=os.environ.get("MICORREO_USER", ""),
+        MICORREO_PASSWORD=os.environ.get("MICORREO_PASSWORD", ""),
+        MICORREO_CUSTOMER_ID=os.environ.get("MICORREO_CUSTOMER_ID", ""),
+        MICORREO_TEST=os.environ.get("MICORREO_TEST", "1")=="1",
         SMTP_HOST=os.environ.get("SMTP_HOST", ""),
         SMTP_PORT=int(os.environ.get("SMTP_PORT", "465")),
         SMTP_USER=os.environ.get("SMTP_USER", ""),
@@ -84,6 +88,8 @@ def create_app(config=None):
     app.register_blueprint(main)
     from app.studio import register
     register(app)
+    from app.shipping import shipping
+    app.register_blueprint(shipping)
     @app.errorhandler(CSRFError)
     def csrf_error(error):
         return render_template("message.html", title="Volvé a abrir el formulario", message="No pudimos validar el envío. Recargá la página e intentá otra vez. Si estabas ingresando, abrí nuevamente el acceso de administración."), 400

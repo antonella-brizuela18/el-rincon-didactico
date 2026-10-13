@@ -7,19 +7,19 @@ Tienda Python/Flask para Alwaysdata y PostgreSQL. Conserva el proyecto original;
 - Portada responsive, buscador, filtros por categoría y formato; fichas de producto.
 - Catálogo paginado con filtros conservados; ya no se ocultan recursos por un límite fijo de resultados.
 - Administración con contraseñas hasheadas, sesiones, CSRF y límite de intentos de acceso.
-- Productos digitales y físicos, borradores/publicación, precios ARS, stock, fotos normalizadas.
+- Productos digitales y físicos, borradores/publicación, precios ARS, elaboración a pedido, fotos normalizadas.
 - Importación administrativa desde una carpeta privada de Drive y sus subcarpetas: PDF/ZIP, portadas JPG/PNG/WebP y documentos de Google exportados a PDF. Copia privada al guardar; no escribe en Drive ni cambia sus permisos.
 - Vista previa privada de borradores y acciones para publicar/ocultar desde el listado. La publicación digital exige un archivo disponible.
 - Carrito y pedidos persistidos con precios calculados en el servidor. Confirmación idempotente.
-- Cantidades editables de materiales físicos y actualización del carrito si se oculta un recurso o cambia el stock.
+- Cantidades editables de materiales físicos y actualización del carrito si se oculta un recurso.
 - Administración con filtros, búsqueda y paginación de productos/pedidos; los contadores representan toda la tienda.
-- Reserva de stock al crear el pedido y devolución al cancelar un pedido pendiente.
+- Materiales físicos hechos a pedido: preparación aproximada de 10 días desde el pago, más tránsito. Sin reservas ni restricciones de stock; hasta 10 unidades por recurso por pedido.
 - Transferencias con verificación manual, referencia y administrador que acreditó el pago.
 - Checkout Pro opcional para pedidos exclusivamente digitales. Notificaciones firmadas, consulta del pago por API y validación de importe, moneda, cuenta receptora y modo de prueba/producción. El retorno del navegador nunca acredita un pago.
 - PDF/ZIP privados, enlaces de pedido firmados (30 días), descargas por 7 días desde la acreditación. Las compras conservan la versión del archivo adquirida. Los reembolsos/contracargos de Mercado Pago deshabilitan descargas posteriores.
 - Cola transaccional de correos de pedido/pago, con trabajador SMTP y reintentos.
 - Salud de proceso en /health y disponibilidad de base/esquema en /health/ready.
-- CI con pruebas SQLite y una prueba concurrente de stock sobre PostgreSQL 17.
+- CI con pruebas SQLite y una prueba de compras concurrentes sobre PostgreSQL 17.
 
 No incluye productos ficticios ni credenciales preconfiguradas. La cuenta administrativa se crea en el servidor. Los pagos, el correo y el despliegue requieren configuración y pruebas con las cuentas reales antes de abrir la tienda.
 
@@ -64,7 +64,7 @@ Para Mercado Pago completar MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, MP_COLLECTOR_ID 
 
 El botón de Mercado Pago aparece solo para pedidos íntegramente digitales. Los materiales físicos se coordinan por transferencia porque el envío no está incluido. Los pagos duplicados o conflictos con una acreditación manual requieren revisión y devolución desde Mercado Pago; el software no ejecuta reembolsos.
 
-Los pedidos pendientes reservan stock hasta que se cancelan desde el panel; todavía no hay vencimiento automático de reservas. Los archivos antiguos se conservan para pedidos anteriores. No borrarlos manualmente.
+No se administra stock. La columna histórica se conserva por compatibilidad pero no limita compras ni se modifica al comprar/cancelar. Los archivos antiguos se conservan para pedidos anteriores. No borrarlos manualmente.
 
 ## Correos
 
@@ -97,7 +97,7 @@ Python 3.12. Crear virtualenv y ejecutar:
     python -m pip install -r requirements-dev.txt
     python -m pytest -q
 
-Para local, definir SECRET_KEY, DATABASE_URL=sqlite:///local.db y COOKIE_SECURE=0. Ejecutar init-db antes de levantar el servidor. PostgreSQL es la base prevista para producción; SQLite no valida los bloqueos concurrentes de stock.
+Para local, definir SECRET_KEY, DATABASE_URL=sqlite:///local.db y COOKIE_SECURE=0. Ejecutar init-db antes de levantar el servidor. PostgreSQL es la base prevista para producción; SQLite no valida los bloqueos de filas de PostgreSQL.
 
 TEST_POSTGRES_URL habilita una prueba que crea y destruye solamente un esquema temporal propio. CI la ejecuta sobre un servicio de PostgreSQL 17.
 
@@ -105,7 +105,7 @@ TEST_POSTGRES_URL habilita una prueba que crea y destruye solamente un esquema t
 
 No se ha conectado el alojamiento ni probado un pago o correo real. Faltan la configuración del sitio, credenciales, cuenta administrativa, cron de correos, respaldos y pruebas integrales desplegadas.
 
-La facturación fiscal, cálculo automático de envíos, cambios/devoluciones, integración de Instagram y notificaciones por WhatsApp no están implementados. Antes de vender, completar los datos del emprendimiento y las condiciones comerciales que correspondan. No hay pedidos ni datos de clientes incluidos en este repositorio.
+La facturación fiscal, cambios/devoluciones, publicaciones automáticas en Instagram y notificaciones automáticas por WhatsApp no están implementados. MiCorreo permite estimar envíos; no compra etiquetas ni suma/cobra el envío automáticamente. Antes de vender, completar los datos del emprendimiento y las condiciones comerciales que correspondan. No hay pedidos ni datos de clientes incluidos en este repositorio.
 
 ## Rediseño, administración y medición
 
@@ -156,3 +156,34 @@ La conversión usa una cohorte de visitas cuyo primer evento conservado está en
 ### SEO
 
 Descripción editable, metadatos sociales, canonical y descripciones por producto, marcado Product/Offer con precio ARS y disponibilidad real, sitemap dinámico de páginas públicas y robots.txt. Admin, carrito y pedidos incluyen `X-Robots-Tag: noindex`; filtros/búsquedas se marcan noindex para evitar variantes indexadas. No se publican opiniones ni calificaciones inventadas. La versión debe desplegarse antes de probar URLs en Search Console y enviar `/sitemap.xml`; el código no verifica propiedad ni promete posiciones. Se necesita contenido original, imágenes reales y revisión editorial de cada producto.
+
+
+## Actualización: compras a pedido, apariencia y MiCorreo
+
+Continuamos en `feat/store-catalog-orders` con Flask/Jinja. React/TypeScript no aporta una ventaja que justifique reescribir autenticación, formularios y despliegue para estos requisitos. La interacción está aislada en `experience.js` y mantiene los formularios del servidor.
+
+Antes de reiniciar, ejecutar los comandos de actualización anteriores, especialmente `init-db`. Esta entrega añade `order_contacts` y `product_parcels` mediante tablas nuevas; no altera ni borra tablas existentes. Los pedidos históricos siguen siendo accesibles aunque no tengan WhatsApp. Conservar la configuración SMTP existente: no hace falta volver a ejecutar configure_mail.
+
+Al confirmar el pago, el servidor habilita las descargas y encola el aviso en la misma transacción. La página pendiente consulta el estado cada 8 segundos mientras está visible y se actualiza al acreditar. No depende del envío de correo para habilitar archivos. La cola SMTP sigue requiriendo su tarea cada minuto; si SMTP falla, el acceso sigue habilitado. El límite de 7 días de descarga se conserva.
+
+La compra física solicita WhatsApp internacional obligatorio; para compras digitales es opcional. El pedido administrativo incluye el enlace para contactar. Los físicos se preparan en aproximadamente 10 días desde el pago; el plazo de transporte es adicional. Nunca se anuncia entrega total en 10 días.
+
+### Cotización MiCorreo
+
+Documentación oficial: https://www.correoargentino.com.ar/MiCorreo/public/img/pag/apiMiCorreo.pdf
+
+Solicitar a Correo Argentino credenciales API para el ambiente deseado y obtener el `customerId` de la cuenta (endpoint oficial `/users/validate` con la autenticación correspondiente). No confundir contraseña API con SMTP ni pegar secretos en el chat.
+
+Desde el servidor ejecutar `python -m deploy.configure_shipping`. Guarda los datos en la configuración privada, preservando correo y base de datos. También se pueden configurar `MICORREO_USER`, `MICORREO_PASSWORD`, `MICORREO_CUSTOMER_ID`, `MICORREO_TEST` en el entorno. El valor predeterminado es prueba; `0` usa producción. Reiniciar después.
+
+En Administración → Configuración completar el código postal de origen. En cada producto físico completar peso en gramos y las tres medidas en centímetros del paquete embalado. El checkout estima tarifas a domicilio/sucursal al ingresar el código postal. Para varias unidades usa un volumen de apilado conservador (suma de alturas y pesos, máximos de largo/ancho). El paquete final debe verificarse manualmente; si supera los límites o faltan medidas se solicita coordinación por WhatsApp. No se cobra una estimación ni se genera un envío automáticamente. Validar las cotizaciones reales con los paquetes usados antes de activar producción.
+
+### Apariencia y privacidad
+
+Administración permite paleta, tres familias tipográficas con fuentes del dispositivo, acento con texto contrastado, modo inicial claro/oscuro/sistema y banner opcional con título, descripción y enlace interno. El visitante puede cambiar el modo y guardarlo localmente. El banner es informativo: las promociones de precio se editan en los productos. No se permite ejecutar HTML/CSS arbitrario desde configuración.
+
+WhatsApp de consultas: +5492915090223; Instagram usa su icono. Ninguno carga rastreadores ni recursos externos antes de que el visitante abra el enlace.
+
+El aviso de medición aparece abierto desde la primera visita. Aceptar y rechazar se guardan durante 180 días en una cookie propia; puede revocarse desde Privacidad. No se mide antes de aceptar, ni con DNT/GPC. Los eventos asociados a pedidos son seudonimizados y pueden vincularse a una compra: no se anuncian como anónimos. La tarea `prune-analytics` sigue siendo necesaria para eliminar eventos mayores de 180 días.
+
+Marco de referencia: Ley 25.326 y orientación de la AAIP (https://www.argentina.gob.ar/aaip/datospersonales/derechos). Un banner por sí solo no acredita cumplimiento legal. Antes de publicar, identificar al responsable real de la tienda y su contacto, revisar plazos de conservación de compras, registros del hosting y obligaciones aplicables. No se incorporan herramientas publicitarias de terceros.

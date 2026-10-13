@@ -13,7 +13,7 @@ from app.models import Base, Order, Product
 
 
 @pytest.mark.skipif(not os.environ.get("TEST_POSTGRES_URL"), reason="PostgreSQL service is provided in CI")
-def test_concurrent_buyers_cannot_oversell(tmp_path):
+def test_concurrent_made_to_order_buyers_both_succeed(tmp_path):
     app = create_app({"TESTING":True, "SECRET_KEY":"ci-only", "DATABASE_URL":os.environ["TEST_POSTGRES_URL"],
                       "STORAGE_DIR":str(tmp_path/"storage"), "SESSION_COOKIE_SECURE":False,
                       "WTF_CSRF_ENABLED":False, "PAYMENT_INSTRUCTIONS":"Test only"})
@@ -36,13 +36,13 @@ def test_concurrent_buyers_cannot_oversell(tmp_path):
             with client.session_transaction() as state:
                 key = state["checkout_key"]
             barrier.wait(timeout=10)
-            return client.post("/pedido/nuevo", data={"checkout_key":key,"name":"Test Customer","email":f"buyer{index}@example.test"}).location
+            return client.post("/pedido/nuevo", data={"checkout_key":key,"name":"Test Customer","email":f"buyer{index}@example.test","whatsapp":"5492915090223"}).location
         with ThreadPoolExecutor(max_workers=2) as workers:
             results = list(workers.map(buy, (1,2)))
-        assert sum(location.endswith("/carrito") for location in results)==1
+        assert all("/pedido/" in location and not location.endswith("/nuevo") for location in results)
         with app.extensions["sessions"]() as db:
-            assert db.query(Order).count()==1
-            assert db.get(Product, 1).stock==0
+            assert db.query(Order).count()==2
+            assert db.get(Product, 1).stock==1
     finally:
         with engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))

@@ -56,6 +56,20 @@ class OrderItem(Base):
     quantity = Column(Integer, nullable=False)
     digital_file = Column(String(80))
 
+class OrderContact(Base):
+    __tablename__ = "order_contacts"
+    order_id = Column(Integer, ForeignKey("orders.id"), primary_key=True)
+    whatsapp = Column(String(16), nullable=False, default="")
+    postal_code = Column(String(8), nullable=False, default="")
+
+class Parcel(Base):
+    __tablename__ = "product_parcels"
+    product_id = Column(Integer, ForeignKey("products.id"), primary_key=True)
+    weight = Column(Integer, nullable=False)
+    height = Column(Integer, nullable=False)
+    width = Column(Integer, nullable=False)
+    length = Column(Integer, nullable=False)
+
 class LoginAttempt(Base):
     __tablename__ = "login_attempts"
     id = Column(Integer, primary_key=True)

@@ -28,6 +28,13 @@ class VisitEvent(Base):
     created_at = Column(DateTime, nullable=False, default=now, index=True)
 
 DEFAULTS = dict(hero_title='Ideas que hacen crecer la imaginación.', hero_text='Materiales didácticos y recursos para transformar los momentos de cada día en pequeñas aventuras de aprendizaje.', announcement='Creado con amor para aprender jugando', theme='floral', contact_email='', order_email='', instagram='elrincondidactico_', seo_description='Materiales didácticos e imprimibles para docentes y familias. El Rincón Didáctico, desde Bahía Blanca: juego, creatividad y aprendizaje.', analytics_enabled='1')
+DEFAULTS.update(font='editorial', default_mode='system', promo_title='', promo_text='', promo_link='/catalogo', promo_label='Ver recursos', accent='#345b32', shipping_origin='')
+
+@studio.before_app_request
+def restore_consent():
+    choice = request.cookies.get('rincon_measurement')
+    if choice in ('yes','no'):
+        session['analytics_consent'] = choice=='yes'
 
 def settings():
     if 'store_settings' not in g:
@@ -48,9 +55,15 @@ def context():
 
 @studio.post('/privacidad/medicion')
 def consent():
-    session['analytics_consent'] = request.form.get('choice') == 'yes'
+    choice = request.form.get('choice')
+    if choice not in ('yes','no'): abort(400)
+    session['analytics_consent'] = choice == 'yes'
     session.pop('analytics_visit', None)
-    return redirect(url_for('main.home'))
+    target = request.form.get('next', '/')
+    if not target.startswith('/') or target.startswith('//') or '\\' in target or any(ord(c)<32 for c in target): target='/'
+    response = redirect(target)
+    response.set_cookie('rincon_measurement', choice, max_age=180*86400, secure=current_app.config['SESSION_COOKIE_SECURE'], httponly=True, samesite='Lax')
+    return response
 
 @studio.after_app_request
 def measure(response):
@@ -84,6 +97,17 @@ def measure(response):
         current_app.logger.warning('Analytics write failed; customer response preserved')
     return response
 
+@studio.get('/apariencia.css')
+def appearance():
+    accent = settings()['accent']
+    if not re.fullmatch(r'#[0-9a-fA-F]{6}', accent): accent=DEFAULTS['accent']
+    # Validated CSS value, separate resource compatible with strict CSP.
+    channels=[int(accent[i:i+2],16)/255 for i in (1,3,5)]
+    linear=[v/12.92 if v<=.04045 else ((v+.055)/1.055)**2.4 for v in channels]
+    luminance=sum(v*w for v,w in zip(linear,(.2126,.7152,.0722)))
+    foreground='#000' if luminance>.179 else '#fff'
+    return Response(':root{--brand-accent:'+accent+';--accent-ink:'+foreground+'}', mimetype='text/css', headers={'Cache-Control':'no-cache'})
+
 @studio.get('/privacidad')
 def privacy():
     return render_template('privacy.html')
@@ -93,8 +117,14 @@ def privacy():
 def configuration():
     if request.method=='POST':
         values={key:request.form.get(key,'').strip() for key in DEFAULTS}
-        limits=dict(hero_title=100,hero_text=350,announcement=140,theme=20,contact_email=254,order_email=254,instagram=30,seo_description=180,analytics_enabled=1)
+        limits=dict(font=20,default_mode=10,promo_title=100,promo_text=250,promo_link=200,promo_label=40,accent=7,shipping_origin=8,hero_title=100,hero_text=350,announcement=140,theme=20,contact_email=254,order_email=254,instagram=30,seo_description=180,analytics_enabled=1)
         error = any(len(values[k])>limit for k,limit in limits.items())
+        error |= values['font'] not in ('editorial','rounded','classic')
+        error |= values['default_mode'] not in ('system','light','dark')
+        error |= not bool(re.fullmatch(r'#[0-9a-fA-F]{6}', values['accent']))
+        values['shipping_origin']=values['shipping_origin'].upper()
+        error |= bool(values['shipping_origin']) and not bool(re.fullmatch(r'(?:[0-9]{4}|[A-Z][0-9]{4}[A-Z]{3})',values['shipping_origin']))
+        error |= not bool(re.fullmatch(r'/[a-zA-Z0-9/_?=&%#.-]*',values['promo_link'])) or values['promo_link'].startswith('//')
         error |= values['theme'] not in ('floral','lavender','sunshine')
         error |= not bool(re.fullmatch(r'[a-zA-Z0-9_.]{1,30}',values['instagram']))
         error |= any(values[k] and not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',values[k]) for k in ('contact_email','order_email'))
