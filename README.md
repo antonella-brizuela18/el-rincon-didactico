@@ -265,3 +265,17 @@ python -m flask --app deploy/wsgi.py init-db
 Reiniciar el sitio tras la creación de tablas. Se añade `order_payment_terms` sin modificar tablas existentes. Los nuevos pedidos guardan el medio elegido y una copia de las instrucciones/condiciones de entrega; editar la tienda no cambia los datos de una compra ya creada. Los pedidos anteriores sin esa tabla asociada conservan el comportamiento de consulta anterior. Desactivar Mercado Pago para nuevas compras no impide validar webhooks de pagos iniciados.
 
 La elección del cliente nunca confirma un pago. Los pagos pendientes por transferencia requieren comprobación real del administrador. Un webhook dirigido a un pedido creado para transferencia queda para revisión, sin habilitar descargas.
+
+## Navegación SPA progresiva y móvil
+
+La tienda conserva un único documento durante la navegación interna. `experience.js` intercepta enlaces y formularios propios, solicita HTML actualizado al servidor y reemplaza contenido/metadata usando History API. Mantiene Atrás/Adelante, anclas, foco accesible, título y canonical. Todos los precios, permisos, CSRF y estados de compra siguen siendo validados por Flask. Sin JavaScript se conservan las rutas y formularios tradicionales.
+
+No se cachean HTML privados ni se precargan pedidos; no se guardan páginas en localStorage o history.state. Se cancelan navegaciones GET anteriores y tareas de la página al cambiar de ruta. Los POST no se repiten ante errores; una respuesta incierta pide revisar antes de intentar otra vez. Se preserva el botón submitter (Comprar ahora / carrito / consentimiento), validación nativa y archivos multipart. Salir de configuración sin guardar mantiene advertencia. La transición de versión obliga a GET/reload para cargar scripts y CSS nuevos, sin volver a enviar el POST.
+
+Mercado Pago, enlaces externos, abrir en otra pestaña y descargas conservan navegación nativa. La salida al proveedor de pago puede recargar porque pertenece a otro servicio. La medición registra la navegación real del cliente, no precargas invisibles.
+
+Para reducir pedidos de recursos se sirve un único `/ui.css?v=HASH`. CSS y JS con fingerprint tienen cache immutable por un año; las imágenes públicas tienen nombres UUID y cache prolongado. HTML de compras/administración sigue con no-store y el color editable conserva su revalidación. No se añade service worker que pueda servir compras o permisos desactualizados.
+
+En móvil (hasta 760 px): menú inferior con área segura, controles de al menos 44–48 px, inputs de 16 px, encabezados/portada/footer centrados, una columna de catálogo, CTA de ancho completo, tablas administrativas con desplazamiento local y guardado en el flujo. El enlace Administración tiene tamaño y contraste explícitos. WhatsApp se muestra dentro del contenido en móvil; no flota sobre el carrito/footer. El aviso de privacidad deja espacio para la navegación inferior. Respeta reduced-motion.
+
+Verificación: Python prueba rutas/CSRF/cache/markup; Node (`node --test tests/navigation.test.cjs`) prueba history, formularios y submitter, errores sin duplicación, salida nativa a pagos, nueva versión y cancelación de navegaciones. Los mocks de DOM no reemplazan la comprobación visual en navegadores reales. El navegador de revisión no admite archivos locales ni cambio de viewport; la revisión en dispositivos físicos sigue siendo necesaria para diferencias de navegador/teclado.

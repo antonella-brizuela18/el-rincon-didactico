@@ -13,7 +13,7 @@ def test_public_revision_and_assets_cache_busting(app,client):
     assert result.headers['Cache-Control']=='no-store'
     page=client.get('/')
     assert page.headers['X-App-Revision']=='a'*40
-    assert 'experience.js?v=' in page.text and 'experience.css?v=' in page.text
+    assert 'experience.js?v=' in page.text and 'ui.css?v=' in page.text
 
 def test_catalogue_sorting(client):
     ascending=client.get('/catalogo?orden=price_asc').text

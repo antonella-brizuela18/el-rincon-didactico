@@ -5,7 +5,7 @@ import re
 from datetime import timedelta
 from pathlib import Path
 import click
-from flask import Flask, g, render_template
+from flask import Flask, g, render_template, request
 from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -85,6 +85,10 @@ def create_app(config=None):
 
     @app.after_request
     def security_headers(response):
+        if request.endpoint=='static':
+            filename=(request.view_args or {}).get('filename')
+            if request.args.get('v')==versions.get(filename) and filename in versions:
+                response.headers['Cache-Control']='public, max-age=31536000, immutable'
         response.headers["X-App-Revision"] = app.config["APP_REVISION"]
         response.headers["X-Content-Type-Options"] = "nosniff"
         # HTTPS CSRF validation needs a same-origin Referer; external links must not receive private URLs.
@@ -99,6 +103,8 @@ def create_app(config=None):
     from app.models import Admin, Base
     from app.routes import main
     app.register_blueprint(main)
+    from app.assets import register as register_assets
+    register_assets(app)
     from app.studio import register
     register(app)
     from app.shipping import shipping

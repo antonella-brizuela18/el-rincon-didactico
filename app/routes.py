@@ -122,7 +122,7 @@ def product_detail(identifier):
 def image(filename):
     if not re.fullmatch(r"[0-9a-f]{32}\.jpg", filename):
         abort(404)
-    return send_from_directory(Path(current_app.config["STORAGE_DIR"])/"images", filename)
+    return send_from_directory(Path(current_app.config["STORAGE_DIR"])/"images", filename, max_age=31536000)
 
 @main.post("/carrito/agregar/<int:identifier>")
 def add_to_cart(identifier):
