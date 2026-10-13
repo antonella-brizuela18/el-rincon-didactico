@@ -14,10 +14,24 @@ class PaymentError(Exception):
     pass
 
 
-def mp_configured():
+def mp_ready():
     config = current_app.config
     return bool(config.get("MP_ACCESS_TOKEN") and config.get("MP_WEBHOOK_SECRET") and
                 config.get("MP_COLLECTOR_ID") and config.get("SITE_URL", "").startswith("https://"))
+
+
+def mp_configured():
+    from app.studio import settings
+    return mp_ready() and settings()['mp_mode']!='off'
+
+def payment_methods(physical=False):
+    from app.studio import settings
+    values=settings()
+    methods=[]
+    if not physical and mp_configured(): methods.append(('mp','Mercado Pago','Tarjetas y opciones disponibles en Mercado Pago.'))
+    if values['transfer_mode']!='off' and values['payment_instructions'].strip():
+        methods.append(('transfer','Transferencia bancaria','Creás el pedido y luego transferís. Verificamos la acreditación.'))
+    return methods
 
 
 def mp_request(method, path, payload=None, key=None):
@@ -50,3 +64,4 @@ def valid_signature(payment_id, request_id, signature):
         return hmac.compare_digest(expected, values["v1"])
     except (ValueError, KeyError):
         return False
+

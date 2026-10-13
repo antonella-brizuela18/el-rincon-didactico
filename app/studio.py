@@ -28,7 +28,7 @@ class VisitEvent(Base):
     created_at = Column(DateTime, nullable=False, default=now, index=True)
 
 DEFAULTS = dict(hero_title='Ideas que hacen crecer la imaginación.', hero_text='Materiales didácticos y recursos para transformar los momentos de cada día en pequeñas aventuras de aprendizaje.', announcement='Creado con amor para aprender jugando', theme='floral', contact_email='', order_email='', instagram='elrincondidactico_', seo_description='Materiales didácticos e imprimibles para docentes y familias. El Rincón Didáctico, desde Bahía Blanca: juego, creatividad y aprendizaje.', analytics_enabled='1')
-DEFAULTS.update(font='editorial', default_mode='system', promo_title='', promo_text='', promo_link='/catalogo', promo_label='Ver recursos', accent='#345b32', shipping_origin='')
+DEFAULTS.update(payment_instructions='', transfer_mode='auto', mp_mode='auto', checkout_enabled='1', whatsapp='5492915090223', preparation_days='10', delivery_note='El envío se coordina por WhatsApp y se abona por separado. Podés consultar su estimación antes de confirmar.', font='editorial', default_mode='system', promo_title='', promo_text='', promo_link='/catalogo', promo_label='Ver recursos', accent='#345b32', shipping_origin='')
 
 @studio.before_app_request
 def restore_consent():
@@ -40,6 +40,7 @@ def settings():
     if 'store_settings' not in g:
         values = DEFAULTS.copy()
         values['contact_email'] = current_app.config.get('CONTACT_EMAIL', '')
+        values['payment_instructions'] = current_app.config.get('PAYMENT_INSTRUCTIONS', '')
         with current_app.extensions['sessions']() as connection:
             values.update({row.key:row.value for row in connection.scalars(select(StoreSetting)) if row.key in DEFAULTS})
         g.store_settings = values
@@ -51,7 +52,9 @@ def context():
     canonical = current_app.config['SITE_URL'] + request.path
     if request.endpoint == 'main.catalog' and request.args.get('pagina', type=int) and request.args.get('pagina', type=int)>1:
         canonical += '?pagina='+str(request.args.get('pagina', type=int))
-    return dict(store=settings(), is_admin=request.path.startswith('/admin') and bool(session.get('admin_id')), private_page=private, canonical=canonical, seo_noindex=private or bool(request.args.get('q') or request.args.get('categoria') or request.args.get('tipo')))
+    from app.payments import payment_methods, mp_ready
+    smtp_ready=all(current_app.config.get(k) for k in ('SMTP_HOST','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'))
+    return dict(payment_methods=payment_methods, mp_ready=mp_ready(), smtp_ready=smtp_ready, store=settings(), is_admin=request.path.startswith('/admin') and bool(session.get('admin_id')), private_page=private, canonical=canonical, seo_noindex=private or bool(request.args.get('q') or request.args.get('categoria') or request.args.get('tipo')))
 
 @studio.post('/privacidad/medicion')
 def consent():
@@ -117,8 +120,15 @@ def privacy():
 def configuration():
     if request.method=='POST':
         values={key:request.form.get(key,'').strip() for key in DEFAULTS}
-        limits=dict(font=20,default_mode=10,promo_title=100,promo_text=250,promo_link=200,promo_label=40,accent=7,shipping_origin=8,hero_title=100,hero_text=350,announcement=140,theme=20,contact_email=254,order_email=254,instagram=30,seo_description=180,analytics_enabled=1)
+        limits=dict(payment_instructions=4000,transfer_mode=10,mp_mode=10,checkout_enabled=1,whatsapp=15,preparation_days=3,delivery_note=400,font=20,default_mode=10,promo_title=100,promo_text=250,promo_link=200,promo_label=40,accent=7,shipping_origin=8,hero_title=100,hero_text=350,announcement=140,theme=20,contact_email=254,order_email=254,instagram=30,seo_description=180,analytics_enabled=1)
         error = any(len(values[k])>limit for k,limit in limits.items())
+        error |= values['transfer_mode'] not in ('auto','on','off') or values['mp_mode'] not in ('auto','on','off')
+        error |= bool(values['whatsapp']) and not bool(re.fullmatch(r'[1-9][0-9]{9,14}',values['whatsapp']))
+        error |= not bool(re.fullmatch(r'[0-9]{1,3}',values['preparation_days'])) or not 1<=int(values['preparation_days'] or '0')<=120
+        error |= values['transfer_mode']=='on' and not values['payment_instructions']
+        from app.payments import mp_ready
+        error |= values['mp_mode']=='on' and not mp_ready()
+        values['checkout_enabled']='1' if values['checkout_enabled']=='1' else '0'
         error |= values['font'] not in ('editorial','rounded','classic')
         error |= values['default_mode'] not in ('system','light','dark')
         error |= not bool(re.fullmatch(r'#[0-9a-fA-F]{6}', values['accent']))
@@ -204,3 +214,4 @@ def register(app):
             connection.execute(delete(VisitEvent).where(VisitEvent.created_at<now()-timedelta(days=180)))
             connection.commit()
         click.echo('Mediciones antiguas eliminadas.')
+

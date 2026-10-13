@@ -6,7 +6,7 @@ import click
 from flask import current_app
 from flask.cli import with_appcontext
 from sqlalchemy import select
-from app.models import MailOutbox, now
+from app.models import MailOutbox, OrderPayment, now
 
 
 def enqueue_mail(db, order, event):
@@ -25,7 +25,8 @@ def enqueue_mail(db, order, event):
         if any(item.kind=="digital" for item in order.items):
             body += "Tus archivos digitales ya están habilitados en el enlace privado, durante 7 días desde la acreditación.\n"
         if any(item.kind=="physical" for item in order.items):
-            body += "Tus materiales se preparan a pedido en aproximadamente 10 días, más el tránsito del correo. Coordinaremos la entrega por WhatsApp.\n"
+            terms=db.get(OrderPayment,order.id)
+            body += (terms.delivery_note if terms else "Tus materiales se preparan a pedido en aproximadamente 10 días, más el tránsito del correo. Coordinaremos la entrega por WhatsApp.")+"\n"
     else:
         body += "Recibimos tu pedido, que queda pendiente de pago.\n"
     body += "\nConsultá los detalles y el estado en tu enlace privado:\n"+link+"\n\nNo compartas este enlace.\nEl Rincón Didáctico"
@@ -75,3 +76,4 @@ def send_mail_command():
                 raise click.ClickException("No se pudo enviar el correo. Quedó en cola para reintento.")
             db.commit()
     click.echo(f"Correos enviados: {delivered}.")
+

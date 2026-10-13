@@ -86,3 +86,12 @@ class MailOutbox(Base):
     body = Column(Text, nullable=False)
     attempts = Column(Integer, nullable=False, default=0)
     sent_at = Column(DateTime)
+
+
+class OrderPayment(Base):
+    """Checkout-time payment and delivery terms; later settings do not rewrite orders."""
+    __tablename__ = 'order_payment_terms'
+    order_id = Column(Integer, ForeignKey('orders.id'), primary_key=True)
+    method = Column(String(20), nullable=False)
+    instructions = Column(Text, nullable=False, default='')
+    delivery_note = Column(Text, nullable=False, default='')

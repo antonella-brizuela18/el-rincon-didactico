@@ -187,3 +187,39 @@ WhatsApp de consultas: +5492915090223; Instagram usa su icono. Ninguno carga ras
 El aviso de medición aparece abierto desde la primera visita. Aceptar y rechazar se guardan durante 180 días en una cookie propia; puede revocarse desde Privacidad. No se mide antes de aceptar, ni con DNT/GPC. Los eventos asociados a pedidos son seudonimizados y pueden vincularse a una compra: no se anuncian como anónimos. La tarea `prune-analytics` sigue siendo necesaria para eliminar eventos mayores de 180 días.
 
 Marco de referencia: Ley 25.326 y orientación de la AAIP (https://www.argentina.gob.ar/aaip/datospersonales/derechos). Un banner por sí solo no acredita cumplimiento legal. Antes de publicar, identificar al responsable real de la tienda y su contacto, revisar plazos de conservación de compras, registros del hosting y obligaciones aplicables. No se incorporan herramientas publicitarias de terceros.
+
+
+## Compra clara y configuración de pagos
+
+Referencias de diseño revisadas: [Awesome Design Systems](https://github.com/alexpate/awesome-design-systems), [Storefront UI](https://github.com/vuestorefront/storefront-ui), [Primer](https://primer.style/) y [Baymard: confirmación de agregado al carrito](https://baymard.com/ecommerce-design-examples/added-to-cart-confirmation). Se adaptan patrones de jerarquía, tarjetas de producto, resumen y pasos de compra con componentes originales en Jinja/CSS. No se importa un framework ni recursos de terceros.
+
+La ficha prioriza precio, formato, condiciones de entrega y **Comprar ahora**. Esa acción agrega el producto y pasa a los datos de compra conservando lo que ya esté en el carrito: el resumen muestra todo antes de confirmar. Agregar al carrito muestra un aviso y deja revisar la selección. El catálogo ofrece acciones directas, filtros y orden por precio/nombre; los resultados se muestran después de una cabecera compacta. El carrito tiene imágenes, cantidades y resumen; checkout presenta datos, medio de pago y entrega, con una explicación explícita de que crear un pedido no cobra dinero.
+
+En **Configuración → Pagos y compras** se puede:
+
+- Editar instrucciones de transferencia (titular, alias/CBU, banco y pasos).
+- Habilitar o deshabilitar transferencia y Mercado Pago. Mercado Pago no se habilita sin las credenciales necesarias; continúa disponible solo en compras exclusivamente digitales.
+- Pausar nuevas compras conservando catálogo, seguimiento, pedidos y webhooks existentes.
+- Cambiar WhatsApp, días de preparación y condiciones de entrega; elegir destinatario de avisos y ver si SMTP está configurado.
+
+Las contraseñas SMTP y tokens se conservan fuera de la base de datos y del repositorio. Conexión de Mercado Pago:
+
+```bash
+python -m deploy.configure_payments
+```
+
+El asistente no muestra ni prueba las credenciales, conserva los demás ajustes y guarda JSON con permisos 600. Luego reiniciar. Usar primero credenciales de prueba, configurar el webhook en Mercado Pago y verificar un pago antes de activar credenciales de producción. Los importes y confirmaciones continúan validados en el servidor.
+
+### Actualización
+
+```bash
+cd "$HOME/el-rincon-didactico"
+git pull --ff-only origin feat/store-catalog-orders
+source "$HOME/venv/bin/activate"
+python -m pip install -r requirements.txt
+python -m flask --app deploy/wsgi.py init-db
+```
+
+Reiniciar el sitio tras la creación de tablas. Se añade `order_payment_terms` sin modificar tablas existentes. Los nuevos pedidos guardan el medio elegido y una copia de las instrucciones/condiciones de entrega; editar la tienda no cambia los datos de una compra ya creada. Los pedidos anteriores sin esa tabla asociada conservan el comportamiento de consulta anterior. Desactivar Mercado Pago para nuevas compras no impide validar webhooks de pagos iniciados.
+
+La elección del cliente nunca confirma un pago. Los pagos pendientes por transferencia requieren comprobación real del administrador. Un webhook dirigido a un pedido creado para transferencia queda para revisión, sin habilitar descargas.

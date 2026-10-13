@@ -1,0 +1,1 @@
+{% macro purchase_steps(active) %}<ol class="purchase-steps" aria-label="Pasos de la compra">{% for label in ['Carrito','Datos y pago','Confirmación'] %}<li {% if loop.index==active %}aria-current="step"{% endif %}><span>{{ loop.index }}</span>{{ label }}</li>{% endfor %}</ol>{% endmacro %}
