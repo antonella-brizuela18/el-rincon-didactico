@@ -80,3 +80,16 @@ def test_bootstrap_has_no_operator_email_or_payment_instructions(client):
     assert 'payment_instructions' not in payload['store'] and 'order_email' not in payload['store']
     assert 'original.pdf' not in json.dumps(payload)
     assert 'experience.js' not in response.text
+
+
+def test_public_assets_compress_but_csrf_html_and_json_do_not(client):
+    import gzip
+    raw=client.get('/ui.css')
+    compressed=client.get('/ui.css',headers={'Accept-Encoding':'gzip'})
+    assert compressed.headers['Content-Encoding']=='gzip'
+    assert gzip.decompress(compressed.data)==raw.data
+    assert len(compressed.data)<len(raw.data)/2
+    assert 'Accept-Encoding' in compressed.headers['Vary']
+    assert client.get('/ui.css',headers={'Accept-Encoding':'gzip;q=0'}).headers.get('Content-Encoding') is None
+    for path in ['/','/api/carrito']:
+        assert client.get(path,headers={'Accept-Encoding':'gzip'}).headers.get('Content-Encoding') is None
