@@ -1,0 +1,13 @@
+{% macro pager(pagination, endpoint, parameter, anchor='') %}
+{% if pagination.pages > 1 %}
+<nav class="pagination" aria-label="Paginación">
+  {% if pagination.page > 1 %}
+  <a href="{{ pagination_url(endpoint, parameter, pagination.page-1, anchor) }}" rel="prev">← Anterior</a>
+  {% endif %}
+  <span>Página {{ pagination.page }} de {{ pagination.pages }}</span>
+  {% if pagination.page < pagination.pages %}
+  <a href="{{ pagination_url(endpoint, parameter, pagination.page+1, anchor) }}" rel="next">Siguiente →</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

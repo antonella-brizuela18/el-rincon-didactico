@@ -5,9 +5,13 @@ Tienda Python/Flask para Alwaysdata y PostgreSQL. Conserva el proyecto original;
 ## Implementado
 
 - Portada responsive, buscador, filtros por categoría y formato; fichas de producto.
+- Catálogo paginado con filtros conservados; ya no se ocultan recursos por un límite fijo de resultados.
 - Administración con contraseñas hasheadas, sesiones, CSRF y límite de intentos de acceso.
 - Productos digitales y físicos, borradores/publicación, precios ARS, stock, fotos normalizadas.
+- Vista previa privada de borradores y acciones para publicar/ocultar desde el listado. La publicación digital exige un archivo disponible.
 - Carrito y pedidos persistidos con precios calculados en el servidor. Confirmación idempotente.
+- Cantidades editables de materiales físicos y actualización del carrito si se oculta un recurso o cambia el stock.
+- Administración con filtros, búsqueda y paginación de productos/pedidos; los contadores representan toda la tienda.
 - Reserva de stock al crear el pedido y devolución al cancelar un pedido pendiente.
 - Transferencias con verificación manual, referencia y administrador que acreditó el pago.
 - Checkout Pro opcional para pedidos exclusivamente digitales. Notificaciones firmadas, consulta del pago por API y validación de importe, moneda, cuenta receptora y modo de prueba/producción. El retorno del navegador nunca acredita un pago.

@@ -12,7 +12,7 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect,
                    render_template, request, send_from_directory, session, url_for)
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 from app.models import Admin, LoginAttempt, Order, OrderItem, Product, now
@@ -64,7 +64,21 @@ def cart_rows(lock=False):
 
 @main.app_context_processor
 def shared_context():
-    return {"cart_count":sum(session.get("cart", {}).values()), "order_link":order_link, "mp_configured":mp_configured()}
+    def pagination_url(endpoint, parameter, page, anchor=""):
+        allowed = {"q","categoria","tipo","recurso","visibilidad","pedido","estado","recursos_pagina","pedidos_pagina"}
+        arguments = {key:value[:100] for key,value in request.args.items() if key in allowed and value}
+        arguments[parameter] = page
+        return url_for(endpoint, _anchor=anchor, **arguments)
+    return {"cart_count":sum(session.get("cart", {}).values()), "order_link":order_link,
+            "mp_configured":mp_configured(), "pagination_url":pagination_url}
+
+
+def paginate(query, name="pagina", per_page=24):
+    total = db().scalar(select(func.count()).select_from(query.order_by(None).subquery()))
+    pages = max(1, (total+per_page-1)//per_page)
+    page = min(pages, max(1, request.args.get(name, 1, type=int) or 1))
+    rows = db().scalars(query.offset((page-1)*per_page).limit(per_page)).all()
+    return rows, {"total":total, "page":page, "pages":pages}
 
 @main.get("/")
 @main.get("/catalogo")
@@ -79,9 +93,9 @@ def home():
         query = query.where(Product.category==category)
     if kind in ("digital", "physical"):
         query = query.where(Product.kind==kind)
-    products = db().scalars(query.order_by(Product.created_at.desc()).limit(100)).all()
+    products, pagination = paginate(query.order_by(Product.created_at.desc(), Product.id.desc()))
     categories = db().scalars(select(Product.category).where(Product.published.is_(True)).distinct().order_by(Product.category)).all()
-    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind)
+    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination)
 
 @main.get("/producto/<int:identifier>")
 def product_detail(identifier):
@@ -125,7 +139,34 @@ def remove_from_cart(identifier):
 @main.get("/carrito")
 def cart():
     rows = cart_rows()
+    current = session.get("cart", {})
+    refreshed = {str(p.id):min(q, p.stock, 10) if p.kind=="physical" else 1 for p,q in rows if p.kind=="digital" or p.stock>0}
+    if current != refreshed:
+        session["cart"] = refreshed
+        session.pop("checkout_key", None)
+        flash("Actualizamos tu carrito porque cambió la disponibilidad de un recurso.")
+        rows = cart_rows()
     return render_template("cart.html", rows=rows, total=sum(p.price_cents*q for p,q in rows))
+
+
+@main.post("/carrito/cantidad/<int:identifier>")
+def update_cart_quantity(identifier):
+    product = db().get(Product, identifier)
+    cart = session.get("cart", {}).copy()
+    if str(identifier) not in cart or not product or not product.published:
+        abort(404)
+    try:
+        quantity = int(request.form.get("quantity", ""))
+    except ValueError:
+        abort(400)
+    limit = min(10, product.stock) if product.kind=="physical" else 1
+    if not 1 <= quantity <= limit:
+        flash("La cantidad debe respetar el stock disponible; los recursos digitales se compran una sola vez.")
+    else:
+        cart[str(identifier)] = quantity
+        session["cart"] = cart
+        session.pop("checkout_key", None)
+    return redirect(url_for("main.cart"))
 
 @main.route("/pedido/nuevo", methods=["GET", "POST"])
 def checkout():
@@ -311,7 +352,62 @@ def logout():
 @main.get("/admin")
 @admin_required
 def admin():
-    return render_template("admin.html", products=db().scalars(select(Product).order_by(Product.id.desc())).all(), orders=db().scalars(select(Order).order_by(Order.id.desc()).limit(100)).all())
+    resource_q = request.args.get("recurso", "").strip()[:100]
+    visibility = request.args.get("visibilidad", "")
+    order_q = request.args.get("pedido", "").strip()[:100]
+    status = request.args.get("estado", "")
+    products_query = select(Product)
+    if resource_q:
+        products_query = products_query.where(Product.title.icontains(resource_q, autoescape=True) | Product.category.icontains(resource_q, autoescape=True))
+    if visibility in ("published", "draft"):
+        products_query = products_query.where(Product.published.is_(visibility=="published"))
+    orders_query = select(Order)
+    if order_q:
+        matching = Order.customer_name.icontains(order_q, autoescape=True) | Order.email.icontains(order_q, autoescape=True)
+        if order_q.isdigit() and len(order_q)<10:
+            matching = matching | (Order.id==int(order_q))
+        orders_query = orders_query.where(matching)
+    if status in ("pending", "paid", "cancelled", "refunded"):
+        orders_query = orders_query.where(Order.status==status)
+    products, product_pages = paginate(products_query.order_by(Product.id.desc()), "recursos_pagina", 20)
+    orders, order_pages = paginate(orders_query.order_by(Order.id.desc()), "pedidos_pagina", 20)
+    stats = {
+        "products":db().scalar(select(func.count()).select_from(Product)),
+        "published":db().scalar(select(func.count()).select_from(Product).where(Product.published.is_(True))),
+        "pending":db().scalar(select(func.count()).select_from(Order).where(Order.status=="pending")),
+    }
+    return render_template("admin.html", products=products, orders=orders, stats=stats,
+                           product_pages=product_pages, order_pages=order_pages,
+                           resource_q=resource_q, visibility=visibility, order_q=order_q, status=status)
+
+
+@main.get("/admin/productos/<int:identifier>/vista-previa")
+@admin_required
+def preview_product(identifier):
+    product = db().get(Product, identifier)
+    if not product:
+        abort(404)
+    return render_template("product.html", product=product, preview=True)
+
+
+@main.post("/admin/productos/<int:identifier>/<action>")
+@admin_required
+def publish_product(identifier, action):
+    product = db().scalar(select(Product).where(Product.id==identifier).with_for_update())
+    if not product:
+        abort(404)
+    if action=="publicar":
+        if product.kind=="digital" and (not product.digital_file or not (Path(current_app.config["STORAGE_DIR"])/"private"/product.digital_file).is_file()):
+            flash("Adjuntá un archivo digital disponible antes de publicar este recurso.")
+            return redirect(url_for("main.edit_product", identifier=identifier))
+        product.published = True
+    elif action=="ocultar":
+        product.published = False
+    else:
+        abort(400)
+    db().commit()
+    flash("Recurso publicado." if product.published else "Recurso ocultado; los pedidos anteriores conservan sus archivos.")
+    return redirect(url_for("main.admin"))
 
 def save_image(upload):
     try:
@@ -364,7 +460,7 @@ def edit_product(identifier=None):
             if request.files.get("digital_file") and request.files["digital_file"].filename:
                 product.digital_file = save_digital(request.files["digital_file"])
             product.published = request.form.get("published")=="on"
-            if product.published and kind=="digital" and not product.digital_file:
+            if product.published and kind=="digital" and (not product.digital_file or not (Path(current_app.config["STORAGE_DIR"])/"private"/product.digital_file).is_file()):
                 raise ValueError("Adjuntá el recurso digital antes de publicarlo.")
             db().add(product)
             db().commit()
