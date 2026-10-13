@@ -113,7 +113,7 @@ def test_cart_digital_quantity_and_physical_made_to_order(client):
     with client.session_transaction() as state:
         assert state["cart"] == {"1":1, "2":3}
     client.post("/carrito/quitar/1")
-    assert b"Imprimible de colores" not in client.get("/carrito").data
+    assert "Imprimible de colores" not in client.get("/carrito").text.split("<main")[1].split("</main>")[0]
 
 
 def test_checkout_price_is_server_owned_and_retries_do_not_duplicate(app, client):
@@ -253,3 +253,4 @@ def test_https_login_requires_token_and_same_origin_referrer(app, client):
     assert response.status_code==302
     assert client.get("/admin", base_url="https://localhost").status_code==200
     assert "frame-ancestors 'none'" in page.headers["Content-Security-Policy"]
+

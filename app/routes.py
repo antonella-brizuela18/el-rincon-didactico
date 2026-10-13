@@ -197,6 +197,10 @@ def checkout():
         if not payment_methods(any(p.kind=='physical' for p,q in rows)):
             return render_template('message.html', title='Consultanos por este pedido', message='Todavía no hay un medio de pago habilitado para estos materiales. Contactanos para coordinar.'),503
         session["checkout_quote"] = {str(p.id):[p.price_cents,q] for p,q in rows}
+        if request.accept_mimetypes.best == "application/json":
+            from app.storefront import cart_data
+            return jsonify(**cart_data(),checkout_key=session["checkout_key"],methods=payment_methods(any(p.kind=="physical" for p,q in rows)))
+        g.react_checkout=True
         return render_template("checkout.html", rows=rows, total=sum(p.price_cents*q for p,q in rows), checkout_key=session["checkout_key"])
     key = request.form.get("checkout_key", "")
     if not key or not hmac.compare_digest(key, session.get("checkout_key", "")):

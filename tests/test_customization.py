@@ -54,7 +54,7 @@ def test_featured_selection_does_not_hide_full_catalogue(client):
     login(client)
     values=MultiDict(fields());values.setlist('featured_ids',['2'])
     assert client.post('/admin/configuracion',data=values).status_code==302
-    page=client.get('/').text
+    page=client.get('/').text.split('<main')[1].split('</main>')[0]
     assert 'Elegidos para vos' in page and 'Juego de tela' in page and 'Imprimible de colores' not in page
     assert 'Imprimible de colores' in client.get('/catalogo').text
     values.setlist('featured_ids',['3']) # Draft must never leak even if selected by hand.

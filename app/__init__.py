@@ -107,6 +107,8 @@ def create_app(config=None):
     register_assets(app)
     from app.studio import register
     register(app)
+    from app.storefront import register as register_storefront
+    register_storefront(app)
     from app.shipping import shipping
     app.register_blueprint(shipping)
     @app.errorhandler(CSRFError)
