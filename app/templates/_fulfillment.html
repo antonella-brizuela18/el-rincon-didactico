@@ -1,0 +1,19 @@
+{% if order.status=='paid' and order.items|selectattr('kind','equalto','physical')|list %}
+<section class="fulfillment" aria-labelledby="fulfillment-title">
+  <p class="eyebrow">Hecho especialmente para vos</p>
+  <h2 id="fulfillment-title">Tu material físico</h2>
+  {% set stages={'preparing':'En preparación','ready':'Listo para coordinar entrega','shipped':'Enviado','delivered':'Entregado'} %}
+  <p class="badge">{{ stages[fulfillment.status if fulfillment else 'preparing'] }}</p>
+  <p class="muted">Preparación aproximada: 10 días desde el pago, más el traslado del correo.</p>
+  {% if fulfillment and fulfillment.tracking %}<p>Código de seguimiento: <strong>{{ fulfillment.tracking }}</strong></p>{% endif %}
+  {% if is_admin %}
+  <form class="stack-form" method="post" action="{{ url_for('main.update_fulfillment',identifier=order.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Estado de preparación<select name="status">{% for key,label in stages.items() %}<option value="{{ key }}" {% if key==(fulfillment.status if fulfillment else 'preparing') %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Código de seguimiento (opcional)<input name="tracking" maxlength="80" value="{{ fulfillment.tracking if fulfillment else '' }}"></label>
+    <button class="button">Guardar preparación</button>
+    <small>Actualiza el seguimiento web. La coordinación por WhatsApp sigue siendo manual.</small>
+  </form>
+  {% endif %}
+</section>
+{% endif %}

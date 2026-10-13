@@ -1,7 +1,8 @@
-name: Store checks
+name: Store checks and deploy
 on:
   push:
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -32,3 +33,35 @@ jobs:
       - run: python -m pytest -q
         env:
           TEST_POSTGRES_URL: postgresql+psycopg://store_test:ci_only_password@localhost:5432/store_test
+  deploy:
+    name: Deploy Alwaysdata
+    needs: tests
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: alwaysdata-production
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://elrincondidactico.alwaysdata.net
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Deploy tested commit and verify public version
+        env:
+          ALWAYS_SSH_KEY: ${{ secrets.ALWAYSDATA_SSH_KEY }}
+          ALWAYS_KNOWN_HOSTS: ${{ secrets.ALWAYSDATA_KNOWN_HOSTS }}
+          ALWAYS_API_KEY: ${{ secrets.ALWAYSDATA_API_KEY }}
+          ALWAYS_SITE_ID: ${{ vars.ALWAYSDATA_SITE_ID }}
+          ALWAYS_ACCOUNT: elrincondidactico
+          ALWAYS_HOST: ssh-elrincondidactico.alwaysdata.net
+          ALWAYS_PROJECT: /home/elrincondidactico/el-rincon-didactico
+          ALWAYS_PYTHON: /home/elrincondidactico/venv/bin/python
+          ALWAYS_URL: https://elrincondidactico.alwaysdata.net
+          DEPLOY_SHA: ${{ github.sha }}
+        run: python -m deploy.actions

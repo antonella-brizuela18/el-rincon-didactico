@@ -70,6 +70,13 @@ class Parcel(Base):
     width = Column(Integer, nullable=False)
     length = Column(Integer, nullable=False)
 
+class Fulfillment(Base):
+    __tablename__ = "order_fulfillment"
+    order_id = Column(Integer, ForeignKey("orders.id"), primary_key=True)
+    status = Column(String(20), nullable=False, default="preparing")
+    tracking = Column(String(80), nullable=False, default="")
+    updated_at = Column(DateTime, nullable=False, default=now)
+
 class LoginAttempt(Base):
     __tablename__ = "login_attempts"
     id = Column(Integer, primary_key=True)

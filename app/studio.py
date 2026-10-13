@@ -51,7 +51,7 @@ def context():
     canonical = current_app.config['SITE_URL'] + request.path
     if request.endpoint == 'main.catalog' and request.args.get('pagina', type=int) and request.args.get('pagina', type=int)>1:
         canonical += '?pagina='+str(request.args.get('pagina', type=int))
-    return dict(store=settings(), is_admin=request.path.startswith('/admin') and bool(session.get('admin_id')), private_page=private, canonical=canonical, seo_noindex=private or bool(request.args.get('q') or request.args.get('categoria') or request.args.get('tipo')))
+    return dict(store=settings(), is_admin=request.path.startswith('/admin') and bool(session.get('admin_id')), private_page=private, canonical=canonical, seo_noindex=private or bool(request.args.get('q') or request.args.get('categoria') or request.args.get('tipo') or request.args.get('orden')))
 
 @studio.post('/privacidad/medicion')
 def consent():

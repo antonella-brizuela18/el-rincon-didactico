@@ -187,3 +187,22 @@ WhatsApp de consultas: +5492915090223; Instagram usa su icono. Ninguno carga ras
 El aviso de medición aparece abierto desde la primera visita. Aceptar y rechazar se guardan durante 180 días en una cookie propia; puede revocarse desde Privacidad. No se mide antes de aceptar, ni con DNT/GPC. Los eventos asociados a pedidos son seudonimizados y pueden vincularse a una compra: no se anuncian como anónimos. La tarea `prune-analytics` sigue siendo necesaria para eliminar eventos mayores de 180 días.
 
 Marco de referencia: Ley 25.326 y orientación de la AAIP (https://www.argentina.gob.ar/aaip/datospersonales/derechos). Un banner por sí solo no acredita cumplimiento legal. Antes de publicar, identificar al responsable real de la tienda y su contacto, revisar plazos de conservación de compras, registros del hosting y obligaciones aplicables. No se incorporan herramientas publicitarias de terceros.
+
+## Publicación desde main
+
+La rama de producción pasa a ser `main`. El workflow prueba cada cambio y en
+main ejecuta el deploy después de las pruebas, con verificación del commit
+publicado. Configuración inicial y diagnóstico: [deploy/AUTODEPLOY.md](deploy/AUTODEPLOY.md).
+Hasta completar los secrets del servidor, Actions indica la configuración que
+falta y el sitio conserva la versión anterior.
+
+El diseño incorpora selector de modo visible en móvil, formatos de catálogo,
+orden por precio/nombre, respuestas sobre compras y avisos de preparación.
+El administrador muestra la versión desplegada. Los productos físicos pagados
+tienen estado manual de preparación/listo/enviado/entregado y código de
+seguimiento, visible en el enlace privado del cliente. Esto no cambia el estado
+del pago ni envía mensajes de WhatsApp automáticamente.
+
+Esta actualización añade `order_fulfillment`: ejecutar `init-db` antes de
+reiniciar; Actions lo hace automáticamente cuando la conexión esté configurada.
+La columna histórica de stock sigue sin limitar compras.

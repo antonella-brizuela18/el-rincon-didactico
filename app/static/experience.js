@@ -10,7 +10,7 @@
     if (button) {
       button.setAttribute('aria-pressed', String(body.dataset.mode === 'dark'));
       button.setAttribute('aria-label', body.dataset.mode === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro');
-      button.querySelector('span').textContent = body.dataset.mode === 'dark' ? 'Claro' : 'Oscuro';
+      button.querySelector('span').textContent = body.dataset.mode === 'dark' ? 'Modo claro' : 'Modo oscuro';
     }
   };
   apply(initial || 'system');
