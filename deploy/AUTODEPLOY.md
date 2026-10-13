@@ -13,14 +13,22 @@ En GitHub → Settings → Secrets and variables → Actions, guardar:
 | --- | --- | --- |
 | Secret | `ALWAYSDATA_SSH_KEY` | Clave privada Ed25519 exclusiva para deploy, cuyo público esté autorizado en Alwaysdata. |
 | Secret | `ALWAYSDATA_KNOWN_HOSTS` | Línea verificada de known_hosts para `ssh-elrincondidactico.alwaysdata.net`. Comparar el fingerprint con Remote access → SSH/SFTP de Alwaysdata; no usar StrictHostKeyChecking=no. |
-| Secret | `ALWAYSDATA_API_KEY` | Token de Alwaysdata autorizado para reiniciar este sitio. |
-| Variable | `ALWAYSDATA_SITE_ID` | `1086130`, confirmado en el panel de Alwaysdata. |
 
 El workflow apunta al checkout existente
 `/home/elrincondidactico/el-rincon-didactico` y al Python
 `/home/elrincondidactico/venv/bin/python`. Antes del primer despliegue verificar
 en la configuración del sitio que estas rutas coinciden con las reales.
 La aplicación WSGI debe apuntar a `deploy/wsgi.py` del mismo checkout.
+
+En el sitio Alwaysdata #1086130, configurar una vez en “uWSGI additional settings”:
+
+```ini
+touch-reload = /home/elrincondidactico/.rincon-reload
+```
+
+El despliegue toca ese archivo después de guardar la revisión. uWSGI detecta
+el cambio y recarga la aplicación. No necesita token API ni cambiar la autenticación
+del panel. Si existe otra configuración adicional uWSGI, conservarla.
 
 Las credenciales no deben ir en el repositorio ni en el chat. El archivo privado
 `~/.config/el-rincon-didactico/settings.json` sigue en el servidor. Su SMTP, base
@@ -36,7 +44,7 @@ de datos y clave de sesión no se reemplazan.
    nuevas; no borra productos, pedidos, recursos ni ajustes privados.
 4. Conserva la referencia anterior en `refs/deploy/previous`, avanza a `main`
    por fast-forward y escribe `.release` con el commit instalado.
-5. Reinicia únicamente el sitio configurado mediante la API oficial de Alwaysdata.
+5. Toca `/home/elrincondidactico/.rincon-reload` para que uWSGI recargue el sitio.
 6. Comprueba `/health/ready` y la portada: exige respuesta saludable, el mismo
    commit y los recursos de interfaz nuevos. Si no coinciden, Actions falla.
 
@@ -53,7 +61,7 @@ rollback de base de datos ni se promete una recuperación automática.
 
 ## Diagnóstico
 
-- “Falta configurar Actions”: completar los tres secrets y la variable.
+- “Falta configurar Actions”: completar los dos secrets.
 - “Hay cambios locales”: revisarlos y conservarlos antes de desplegar; el script
   no ejecuta reset/clean ni descarta trabajo del servidor.
 - “Hay una versión main más nueva”: reejecutar el último workflow de main.
@@ -62,5 +70,6 @@ rollback de base de datos ni se promete una recuperación automática.
 
 Referencias oficiales:
 - https://help.alwaysdata.com/en/docs/development/api/
+- https://uwsgi-docs.readthedocs.io/en/latest/Management.html
 - https://help.alwaysdata.com/en/docs/web-hosting/remote-access/ssh/
 - https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments

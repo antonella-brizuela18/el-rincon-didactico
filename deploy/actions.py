@@ -1,8 +1,7 @@
-"""GitHub runner entry point: SSH upload, restart and exact-version health check.
+"""GitHub runner entry point: SSH deployment, reload and exact-version health check.
 
 Only stdlib is used. Credentials live in the ephemeral runner, never in artifacts.
 """
-import base64
 import json
 import os
 from pathlib import Path
@@ -15,14 +14,13 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 def configuration(environ):
-    required=('ALWAYS_SSH_KEY','ALWAYS_KNOWN_HOSTS','ALWAYS_API_KEY','ALWAYS_SITE_ID',
+    required=('ALWAYS_SSH_KEY','ALWAYS_KNOWN_HOSTS',
               'ALWAYS_ACCOUNT','ALWAYS_HOST','ALWAYS_PROJECT','ALWAYS_PYTHON','ALWAYS_URL','DEPLOY_SHA')
     missing=[key for key in required if not environ.get(key)]
     if missing:
         raise ValueError('Falta configurar Actions: '+', '.join(missing)+'. Ver deploy/AUTODEPLOY.md.')
     config={key:environ[key] for key in required}
     if not re.fullmatch(r'[0-9a-f]{40}',config['DEPLOY_SHA']): raise ValueError('Commit inválido.')
-    if not config['ALWAYS_SITE_ID'].isdigit(): raise ValueError('ID de sitio inválido.')
     if config['ALWAYS_HOST']!='ssh-elrincondidactico.alwaysdata.net' or config['ALWAYS_ACCOUNT']!='elrincondidactico':
         raise ValueError('Destino inesperado.')
     if config['ALWAYS_URL']!='https://elrincondidactico.alwaysdata.net': raise ValueError('URL inesperada.')
@@ -57,11 +55,7 @@ def main():
         script=Path(__file__).with_name('remote.py').read_text()
         command=shlex.join([config['ALWAYS_PYTHON'],'-',sha,config['ALWAYS_PROJECT']])
         subprocess.run(ssh+[command],input=script,text=True,check=True,timeout=600)
-        credentials=base64.b64encode((config['ALWAYS_API_KEY']+' account='+config['ALWAYS_ACCOUNT']+':').encode()).decode()
-        restart=Request('https://api.alwaysdata.com/v1/site/'+config['ALWAYS_SITE_ID']+'/restart/',
-                        method='POST',data=b'',headers={'Authorization':'Basic '+credentials})
-        with urlopen(restart,timeout=30) as response:
-            if response.status not in (200,202,204): raise RuntimeError('Alwaysdata no confirmó el reinicio.')
+        # remote.py updates the file monitored by uWSGI touch-reload.
         if not verify(config['ALWAYS_URL'],sha):
             raise RuntimeError('La versión pública no coincide o no está saludable. Revisar el reinicio en Alwaysdata; no se declara éxito.')
     summary='Publicado y verificado: '+sha+'\n'+config['ALWAYS_URL']+'\n'

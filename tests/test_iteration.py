@@ -50,7 +50,7 @@ def test_fulfillment_digital_rejected_and_csrf(app,client):
     assert client.post('/admin/pedidos/1/preparacion',data={'status':'shipped'}).status_code==400
 
 def deployment_config():
-    return dict(ALWAYS_SSH_KEY='fake-key',ALWAYS_KNOWN_HOSTS='fake-host',ALWAYS_API_KEY='fake-api',ALWAYS_SITE_ID='1086130',ALWAYS_ACCOUNT='elrincondidactico',ALWAYS_HOST='ssh-elrincondidactico.alwaysdata.net',ALWAYS_PROJECT='/home/elrincondidactico/el-rincon-didactico',ALWAYS_PYTHON='/home/elrincondidactico/venv/bin/python',ALWAYS_URL='https://elrincondidactico.alwaysdata.net',DEPLOY_SHA='b'*40)
+    return dict(ALWAYS_SSH_KEY='fake-key',ALWAYS_KNOWN_HOSTS='fake-host',ALWAYS_ACCOUNT='elrincondidactico',ALWAYS_HOST='ssh-elrincondidactico.alwaysdata.net',ALWAYS_PROJECT='/home/elrincondidactico/el-rincon-didactico',ALWAYS_PYTHON='/home/elrincondidactico/venv/bin/python',ALWAYS_URL='https://elrincondidactico.alwaysdata.net',DEPLOY_SHA='b'*40)
 
 def test_deployment_configuration_refuses_missing_and_unexpected_destinations():
     with pytest.raises(ValueError,match='Falta configurar'): configuration({})

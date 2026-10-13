@@ -59,6 +59,7 @@ def main(sha, directory):
         else:
             git('switch','-c','main',sha)
         marker=project/'.release.tmp';marker.write_text(sha+'\n');os.replace(marker,project/'.release')
+        (home/'.rincon-reload').touch()
         print('Código actualizado a '+sha+'. Versión anterior conservada: '+previous)
 
 if __name__=='__main__':
