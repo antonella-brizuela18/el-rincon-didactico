@@ -15,7 +15,7 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
-from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, OrderPayment, Parcel, Product, now
+from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, Parcel, Product, Fulfillment, OrderPayment, now
 from app import csrf
 from app.payments import PaymentError, mp_configured, mp_ready, payment_methods, mp_request, valid_signature
 from app.notifications import enqueue_mail
@@ -66,7 +66,7 @@ def cart_rows(lock=False):
 @main.app_context_processor
 def shared_context():
     def pagination_url(endpoint, parameter, page, anchor=""):
-        allowed = {"q","categoria","tipo","recurso","visibilidad","pedido","estado","recursos_pagina","pedidos_pagina","orden"}
+        allowed = {"q","categoria","tipo","orden","recurso","visibilidad","pedido","estado","recursos_pagina","pedidos_pagina"}
         arguments = {key:value[:100] for key,value in request.args.items() if key in allowed and value}
         arguments[parameter] = page
         return url_for(endpoint, _anchor=anchor, **arguments)
@@ -100,12 +100,16 @@ def catalogue_page(is_home):
         query = query.where(Product.category==category)
     if kind in ("digital", "physical"):
         query = query.where(Product.kind==kind)
-    sort=request.args.get('orden','recent')
-    ordering={'recent':Product.created_at.desc(),'price_asc':Product.price_cents.asc(),'price_desc':Product.price_cents.desc(),'title':Product.title.asc()}
-    if sort not in ordering: sort='recent'
-    products, pagination = paginate(query.order_by(ordering[sort], Product.id.desc()))
+    sort = request.args.get('orden','recent')
+    sorting={'recent':(Product.created_at.desc(),Product.id.desc()),'price_asc':(Product.price_cents.asc(),Product.id.desc()),'price_desc':(Product.price_cents.desc(),Product.id.desc()),'title':(Product.title.asc(),Product.id.asc())}
+    if sort not in sorting: sort='recent'
+    from app.studio import settings
+    featured_ids=[int(value) for value in settings()['featured_ids'].split(',') if value.isdigit()]
+    curated=is_home and not (search or category or kind) and bool(featured_ids)
+    if curated: query=query.where(Product.id.in_(featured_ids))
+    products, pagination = paginate(query.order_by(*sorting[sort]))
     categories = db().scalars(select(Product.category).where(Product.published.is_(True)).distinct().order_by(Product.category)).all()
-    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination, is_home=is_home, sort=sort)
+    return render_template("index.html", products=products, categories=categories, search=search, category=category, kind=kind, pagination=pagination, is_home=is_home, sort=sort, curated=curated)
 
 @main.get("/producto/<int:identifier>")
 def product_detail(identifier):
@@ -252,7 +256,7 @@ def checkout():
 @main.get("/pedido/<token>")
 def order_detail(token):
     order = customer_order(token)
-    return render_template("order.html", order=order, token=token, payment_terms=db().get(OrderPayment,order.id), can_download=order.status=="paid" and bool(order.paid_at) and order.paid_at>=now()-timedelta(days=7))
+    return render_template("order.html", order=order, token=token, fulfillment=db().get(Fulfillment,order.id), payment_terms=db().get(OrderPayment,order.id), can_download=order.status=="paid" and bool(order.paid_at) and order.paid_at>=now()-timedelta(days=7))
 
 @main.get("/pedido/<token>/estado")
 def order_status(token):
@@ -349,7 +353,9 @@ def mp_webhook():
         order.paid_at = order.paid_at or now()
         enqueue_mail(db(), order, "paid")
     db().commit()
-    return jsonify(status="ok")
+    response=jsonify(status="ok",revision=current_app.config["APP_REVISION"])
+    response.headers["Cache-Control"]="no-store"
+    return response
 
 @main.route("/admin/login", methods=["GET", "POST"])
 def login():
@@ -475,7 +481,13 @@ def save_image(upload):
                 raise ValueError("Usá JPG, PNG o WebP de hasta 20 megapíxeles.")
             picture.thumbnail((1400, 1400))
             filename = f"{secrets.token_hex(16)}.jpg"
-            picture.convert("RGB").save(Path(current_app.config["STORAGE_DIR"])/"images"/filename, "JPEG", quality=85)
+            if picture.mode in ("RGBA","LA") or "transparency" in picture.info:
+                rgba=picture.convert("RGBA")
+                normalized=Image.new("RGB",rgba.size,"white")
+                normalized.paste(rgba,mask=rgba.getchannel("A"))
+            else:
+                normalized=picture.convert("RGB")
+            normalized.save(Path(current_app.config["STORAGE_DIR"])/"images"/filename, "JPEG", quality=85)
             return filename
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as error:
         raise ValueError("El archivo de imagen no es válido.") from error
@@ -579,7 +591,24 @@ def admin_order(identifier):
     order = db().get(Order, identifier)
     if not order:
         abort(404)
-    return render_template("admin_order.html", order=order, contact=db().get(OrderContact, order.id), payment_terms=db().get(OrderPayment,order.id))
+    return render_template("admin_order.html", order=order, contact=db().get(OrderContact, order.id), fulfillment=db().get(Fulfillment,order.id), payment_terms=db().get(OrderPayment,order.id))
+
+@main.post('/admin/pedidos/<int:identifier>/preparacion')
+@admin_required
+def update_fulfillment(identifier):
+    order=db().scalar(select(Order).where(Order.id==identifier).with_for_update())
+    if not order: abort(404)
+    if order.status!='paid' or not any(item.kind=='physical' for item in order.items): abort(409)
+    status=request.form.get('status','')
+    tracking=request.form.get('tracking','').strip()
+    if status not in ('preparing','ready','shipped','delivered') or len(tracking)>80 or (tracking and not re.fullmatch(r'[A-Za-z0-9 -]+',tracking)):
+        abort(400)
+    row=db().get(Fulfillment,order.id)
+    if not row: row=Fulfillment(order_id=order.id);db().add(row)
+    row.status,row.tracking,row.updated_at=status,tracking,now()
+    db().commit()
+    flash('Preparación actualizada. El cliente puede ver el estado en su enlace privado.')
+    return redirect(url_for('main.admin_order',identifier=identifier))
 
 @main.post("/admin/pedidos/<int:identifier>/<action>")
 @admin_required
@@ -615,7 +644,9 @@ def readiness():
     except SQLAlchemyError:
         db().rollback()
         return jsonify(status="unavailable"), 503
-    return jsonify(status="ok")
+    response=jsonify(status="ok",revision=current_app.config["APP_REVISION"])
+    response.headers["Cache-Control"]="no-store"
+    return response
 
 @main.app_errorhandler(413)
 def too_large(error):

@@ -188,6 +188,48 @@ El aviso de medición aparece abierto desde la primera visita. Aceptar y rechaza
 
 Marco de referencia: Ley 25.326 y orientación de la AAIP (https://www.argentina.gob.ar/aaip/datospersonales/derechos). Un banner por sí solo no acredita cumplimiento legal. Antes de publicar, identificar al responsable real de la tienda y su contacto, revisar plazos de conservación de compras, registros del hosting y obligaciones aplicables. No se incorporan herramientas publicitarias de terceros.
 
+## Publicación desde main
+
+La rama de producción pasa a ser `main`. El workflow prueba cada cambio y en
+main ejecuta el deploy después de las pruebas, con verificación del commit
+publicado. Configuración inicial y diagnóstico: [deploy/AUTODEPLOY.md](deploy/AUTODEPLOY.md).
+Hasta completar los secrets del servidor, Actions indica la configuración que
+falta y el sitio conserva la versión anterior.
+
+El diseño incorpora selector de modo visible en móvil, formatos de catálogo,
+orden por precio/nombre, respuestas sobre compras y avisos de preparación.
+El administrador muestra la versión desplegada. Los productos físicos pagados
+tienen estado manual de preparación/listo/enviado/entregado y código de
+seguimiento, visible en el enlace privado del cliente. Esto no cambia el estado
+del pago ni envía mensajes de WhatsApp automáticamente.
+
+Esta actualización añade `order_fulfillment`: ejecutar `init-db` antes de
+reiniciar; Actions lo hace automáticamente cuando la conexión esté configurada.
+La columna histórica de stock sigue sin limitar compras.
+
+## Personalización ampliada
+
+Administración → Configuración permite subir logo y foto de portada, cambiar
+nombre/frase/ubicación de marca, textos de portada e historia, espaciado, menú
+fijo, estilo de tarjetas, columnas en escritorio y encuadre de fotos. Las
+secciones de categorías, beneficios, preguntas frecuentes e historia se pueden
+ocultar. La portada admite hasta ocho recursos destacados elegidos entre los
+publicados; el catálogo completo conserva todos los productos y sus filtros.
+
+Las imágenes JPG/PNG/WebP se normalizan a JPEG (máximo 5 MB, 20 megapíxeles).
+No se aceptan SVG ni archivos ejecutables desde administración. Logo y foto
+se pueden quitar para volver a la ilustración floral. Configuraciones abiertas
+desde una versión anterior conservan los nuevos ajustes al guardar.
+
+WhatsApp usa el icono de Bootstrap Icons (licencia MIT en
+`app/static/bootstrap-icons-LICENSE.txt`), con texto visible en móvil. Número,
+texto del botón y mensaje inicial son editables. Las fichas preparan una consulta
+con el título del recurso y su URL pública; abrir el enlace no envía el mensaje.
+Las tarjetas permiten agregar directamente al carrito mediante formulario CSRF.
+
+Referencias de navegación y catálogo: Aprendo Jugando y DidacTO3D. No se importan
+sus productos, textos, promociones, opiniones ni datos de clientes.
+
 
 ## Compra clara y configuración de pagos
 

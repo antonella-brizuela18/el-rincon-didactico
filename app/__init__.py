@@ -1,5 +1,7 @@
 """Configuration and secrets stay outside the repository."""
 import os
+import hashlib
+import re
 from datetime import timedelta
 from pathlib import Path
 import click
@@ -42,6 +44,16 @@ def create_app(config=None):
         GOOGLE_DRIVE_CREDENTIALS=os.environ.get("GOOGLE_DRIVE_CREDENTIALS", ""),
         TRUSTED_HOSTS=[host.strip() for host in os.environ.get("TRUSTED_HOSTS", "").split(",") if host.strip()] or None,
     )
+    marker=Path(app.root_path).parent/'.release'
+    revision=marker.read_text().strip() if marker.is_file() else 'development'
+    app.config['APP_REVISION']=revision if re.fullmatch(r'[0-9a-f]{40}',revision) else 'development'
+    versions={p.relative_to(app.static_folder).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()[:12]
+              for p in Path(app.static_folder).rglob('*') if p.is_file()}
+    @app.url_defaults
+    def static_version(endpoint, values):
+        if endpoint=='static' and values.get('filename') in versions:
+            values.setdefault('v',versions[values['filename']])
+
     if config:
         app.config.update(config)
     if not app.config["SECRET_KEY"] or not app.config["DATABASE_URL"]:
@@ -73,6 +85,7 @@ def create_app(config=None):
 
     @app.after_request
     def security_headers(response):
+        response.headers["X-App-Revision"] = app.config["APP_REVISION"]
         response.headers["X-Content-Type-Options"] = "nosniff"
         # HTTPS CSRF validation needs a same-origin Referer; external links must not receive private URLs.
         response.headers["Referrer-Policy"] = "same-origin"

@@ -75,9 +75,9 @@ def test_transfer_cannot_be_silently_paid_by_mp_webhook(app,client,monkeypatch):
 
 def test_admin_payment_validation_and_public_contact(app,client):
     login(client)
-    for change in [{'whatsapp':'javascript:alert(1)'},{'preparation_days':'0'},{'transfer_mode':'on','payment_instructions':''},{'mp_mode':'on'},{'transfer_mode':'unexpected'}]:
+    for change in [{'whatsapp_number':'javascript:alert(1)'},{'preparation_days':'0'},{'transfer_mode':'on','payment_instructions':''},{'mp_mode':'on'},{'transfer_mode':'unexpected'}]:
         assert client.post('/admin/configuracion',data=dict(DEFAULTS,**change)).status_code==400
-    values=dict(DEFAULTS,payment_instructions='Banco y alias',transfer_mode='on',whatsapp='5492915111111',preparation_days='15')
+    values=dict(DEFAULTS,payment_instructions='Banco y alias',transfer_mode='on',whatsapp_number='5492915111111',preparation_days='15')
     assert client.post('/admin/configuracion',data=values).status_code==302
     page=client.get('/producto/2').text
     assert '15 días' in page and 'https://wa.me/5492915111111' in page

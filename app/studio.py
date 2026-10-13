@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models import Base, Product, Order, MailOutbox, now
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from app.routes import db, admin_required
+from app import customization
 
 studio = Blueprint('studio', __name__)
 
@@ -28,7 +29,9 @@ class VisitEvent(Base):
     created_at = Column(DateTime, nullable=False, default=now, index=True)
 
 DEFAULTS = dict(hero_title='Ideas que hacen crecer la imaginación.', hero_text='Materiales didácticos y recursos para transformar los momentos de cada día en pequeñas aventuras de aprendizaje.', announcement='Creado con amor para aprender jugando', theme='floral', contact_email='', order_email='', instagram='elrincondidactico_', seo_description='Materiales didácticos e imprimibles para docentes y familias. El Rincón Didáctico, desde Bahía Blanca: juego, creatividad y aprendizaje.', analytics_enabled='1')
-DEFAULTS.update(payment_instructions='', transfer_mode='auto', mp_mode='auto', checkout_enabled='1', whatsapp='5492915090223', preparation_days='10', delivery_note='El envío se coordina por WhatsApp y se abona por separado. Podés consultar su estimación antes de confirmar.', font='editorial', default_mode='system', promo_title='', promo_text='', promo_link='/catalogo', promo_label='Ver recursos', accent='#345b32', shipping_origin='')
+DEFAULTS.update(payment_instructions='', transfer_mode='auto', mp_mode='auto', checkout_enabled='1', preparation_days='10', delivery_note='El envío se coordina por WhatsApp y se abona por separado. Podés consultar su estimación antes de confirmar.', font='editorial', default_mode='system', promo_title='', promo_text='', promo_link='/catalogo', promo_label='Ver recursos', accent='#345b32', shipping_origin='')
+
+DEFAULTS.update(customization.DEFAULTS)
 
 @studio.before_app_request
 def restore_consent():
@@ -54,7 +57,7 @@ def context():
         canonical += '?pagina='+str(request.args.get('pagina', type=int))
     from app.payments import payment_methods, mp_ready
     smtp_ready=all(current_app.config.get(k) for k in ('SMTP_HOST','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'))
-    return dict(payment_methods=payment_methods, mp_ready=mp_ready(), smtp_ready=smtp_ready, store=settings(), is_admin=request.path.startswith('/admin') and bool(session.get('admin_id')), private_page=private, canonical=canonical, seo_noindex=private or bool(request.args.get('q') or request.args.get('categoria') or request.args.get('tipo')))
+    return dict(payment_methods=payment_methods, mp_ready=mp_ready(), smtp_ready=smtp_ready, store=settings(), is_admin=request.path.startswith('/admin') and bool(session.get('admin_id')), private_page=private, canonical=canonical, whatsapp_url=lambda message=None:customization.whatsapp_url(settings(),message), seo_noindex=private or bool(request.args.get('q') or request.args.get('categoria') or request.args.get('tipo') or request.args.get('orden')))
 
 @studio.post('/privacidad/medicion')
 def consent():
@@ -115,15 +118,24 @@ def appearance():
 def privacy():
     return render_template('privacy.html')
 
+def configuration_page(values):
+    available=db().scalars(select(Product).where(Product.published.is_(True)).order_by(Product.title).limit(500)).all()
+    return render_template('settings.html',values=values,available_products=available)
+
 @studio.route('/admin/configuracion', methods=['GET','POST'])
 @admin_required
 def configuration():
     if request.method=='POST':
-        values={key:request.form.get(key,'').strip() for key in DEFAULTS}
-        limits=dict(payment_instructions=4000,transfer_mode=10,mp_mode=10,checkout_enabled=1,whatsapp=15,preparation_days=3,delivery_note=400,font=20,default_mode=10,promo_title=100,promo_text=250,promo_link=200,promo_label=40,accent=7,shipping_origin=8,hero_title=100,hero_text=350,announcement=140,theme=20,contact_email=254,order_email=254,instagram=30,seo_description=180,analytics_enabled=1)
+        values={key:request.form.get(key,settings()[key]).strip() for key in DEFAULTS if key not in customization.DEFAULTS}
+        if request.form.get('commerce_version')=='1': values['checkout_enabled']='1' if request.form.get('checkout_enabled')=='1' else '0'
+        try:
+            values.update(customization.read_values(request.form,settings()))
+        except ValueError as error:
+            flash(str(error))
+            return configuration_page(values=dict(settings(),**values)),400
+        limits=dict(payment_instructions=4000,transfer_mode=10,mp_mode=10,checkout_enabled=1,preparation_days=3,delivery_note=400,font=20,default_mode=10,promo_title=100,promo_text=250,promo_link=200,promo_label=40,accent=7,shipping_origin=8,hero_title=100,hero_text=350,announcement=140,theme=20,contact_email=254,order_email=254,instagram=30,seo_description=180,analytics_enabled=1)
         error = any(len(values[k])>limit for k,limit in limits.items())
         error |= values['transfer_mode'] not in ('auto','on','off') or values['mp_mode'] not in ('auto','on','off')
-        error |= bool(values['whatsapp']) and not bool(re.fullmatch(r'[1-9][0-9]{9,14}',values['whatsapp']))
         error |= not bool(re.fullmatch(r'[0-9]{1,3}',values['preparation_days'])) or not 1<=int(values['preparation_days'] or '0')<=120
         error |= values['transfer_mode']=='on' and not values['payment_instructions']
         from app.payments import mp_ready
@@ -141,8 +153,13 @@ def configuration():
         error |= not values['hero_title'] or not values['seo_description']
         if error:
             flash('Revisá los campos: título y descripción obligatorios, correos válidos y textos dentro de sus límites.')
-            return render_template('settings.html', values=values),400
+            return configuration_page(values=values),400
         values['analytics_enabled']='1' if values['analytics_enabled']=='1' else '0'
+        try:
+            customization.save_assets(request.files,request.form,values)
+        except ValueError as error:
+            flash(str(error))
+            return configuration_page(values=values),400
         for key,value in values.items():
             row=db().get(StoreSetting,key)
             if row: row.value=value
@@ -150,7 +167,7 @@ def configuration():
         db().commit()
         flash('Configuración guardada. Los cambios ya se ven en tu tienda.')
         return redirect(url_for('studio.configuration'))
-    return render_template('settings.html',values=settings())
+    return configuration_page(values=settings())
 
 @studio.get('/admin/estadisticas')
 @admin_required

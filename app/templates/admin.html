@@ -15,6 +15,7 @@
   {% if not stats.products %}
   <div class="notice onboarding-note"><strong>Tu tienda está lista para su primer recurso.</strong><p>Cargá una descripción, precio y foto. Si es digital, adjuntá el PDF o ZIP. Podés guardarlo como borrador y revisar la vista previa antes de publicarlo.</p><a class="button small" href="{{ url_for('main.edit_product') }}">Cargar mi primer recurso</a></div>
   {% endif %}
+  <div class="release-status"><span class="status-dot" aria-hidden="true"></span><p><strong>Versión de la tienda</strong><br><code>{{ config.APP_REVISION[:12] }}</code> · <a href="https://github.com/antonella-brizuela18/el-rincon-didactico/actions" target="_blank" rel="noopener">Ver actualizaciones</a></p></div>
   <section id="mis-recursos">
     <div class="section-heading"><h2>Mis recursos</h2><div class="resource-toolbar"><a class="button small secondary-button" href="{{ url_for('main.drive_browser') }}">Importar desde Drive</a><a class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
     <form class="filters admin-filters" method="get" action="{{ url_for('main.admin') }}#mis-recursos">
