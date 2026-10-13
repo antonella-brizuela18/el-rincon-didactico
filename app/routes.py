@@ -19,6 +19,7 @@ from app.models import Admin, LoginAttempt, Order, OrderItem, Product, now
 from app import csrf
 from app.payments import PaymentError, mp_configured, mp_request, valid_signature
 from app.notifications import enqueue_mail
+from app import drive
 main = Blueprint("main", __name__)
 DUMMY_HASH = generate_password_hash("not-an-account-password")
 
@@ -381,6 +382,30 @@ def admin():
                            resource_q=resource_q, visibility=visibility, order_q=order_q, status=status)
 
 
+@main.get("/admin/drive")
+@admin_required
+def drive_browser():
+    product_id=request.args.get("producto", type=int)
+    if product_id and not db().get(Product, product_id):
+        abort(404)
+    folder=request.args.get("carpeta", "")
+    search=request.args.get("buscar", "").strip()[:100]
+    token=request.args.get("pagina", "")
+    files=[]
+    info=None
+    next_token=""
+    error=""
+    if drive.configured():
+        try:
+            info,files,next_token=drive.list_folder(folder, token, search)
+        except drive.DriveError as problem:
+            error=str(problem)
+    return render_template("drive.html", files=files, folder=info, search=search,
+                           next_token=next_token, error=error, configured=drive.configured(),
+                           root_folder=current_app.config["GOOGLE_DRIVE_FOLDER_ID"], product_id=product_id,
+                           resource_mimes=drive.RESOURCE_MIMES, image_mimes=drive.IMAGE_MIMES, folder_mime=drive.FOLDER_MIME)
+
+
 @main.get("/admin/productos/<int:identifier>/vista-previa")
 @admin_required
 def preview_product(identifier):
@@ -440,6 +465,26 @@ def edit_product(identifier=None):
     product = db().get(Product, identifier) if identifier else Product(published=False, kind="digital", stock=0)
     if product is None:
         abort(404)
+    drive_file_id=(request.form if request.method=="POST" else request.args).get("drive_file", "")
+    drive_image_id=(request.form if request.method=="POST" else request.args).get("drive_image", "")
+    selected_file=None
+    selected_image=None
+    if request.method=="GET":
+        try:
+            if drive_file_id:
+                selected_file=drive.permitted_metadata(drive_file_id)
+                if selected_file.get("mimeType") not in drive.RESOURCE_MIMES:
+                    raise drive.DriveError("Ese archivo no puede usarse como recurso descargable.")
+                if not identifier:
+                    product.title=Path(selected_file["name"]).stem[:160]
+                    product.category="Recursos didácticos"
+            if drive_image_id:
+                selected_image=drive.permitted_metadata(drive_image_id)
+                if selected_image.get("mimeType") not in drive.IMAGE_MIMES:
+                    raise drive.DriveError("Ese archivo no puede usarse como portada.")
+        except drive.DriveError as problem:
+            flash(str(problem))
+            return redirect(url_for("main.drive_browser", producto=identifier))
     if request.method=="POST":
         try:
             title = request.form.get("title", "").strip()
@@ -456,9 +501,21 @@ def edit_product(identifier=None):
             product.age = request.form.get("age", "").strip()[:80]
             product.price_cents, product.stock = int(price*100), stock
             if request.files.get("image") and request.files["image"].filename:
+                if drive_image_id:
+                    raise ValueError("Elegí una portada desde tu equipo o Drive, no ambas.")
                 product.image = save_image(request.files["image"])
+            elif drive_image_id:
+                upload,selected_image=drive.download(drive_image_id, image=True)
+                product.image=save_image(upload)
             if request.files.get("digital_file") and request.files["digital_file"].filename:
+                if drive_file_id:
+                    raise ValueError("Elegí un recurso desde tu equipo o Drive, no ambos.")
                 product.digital_file = save_digital(request.files["digital_file"])
+            elif drive_file_id:
+                if kind!="digital":
+                    raise ValueError("El archivo de Drive se usa en recursos digitales.")
+                upload,selected_file=drive.download(drive_file_id)
+                product.digital_file=save_digital(upload)
             product.published = request.form.get("published")=="on"
             if product.published and kind=="digital" and (not product.digital_file or not (Path(current_app.config["STORAGE_DIR"])/"private"/product.digital_file).is_file()):
                 raise ValueError("Adjuntá el recurso digital antes de publicarlo.")
@@ -466,10 +523,11 @@ def edit_product(identifier=None):
             db().commit()
             flash("Recurso guardado.")
             return redirect(url_for("main.admin"))
-        except (ValueError, InvalidOperation) as error:
+        except (ValueError, InvalidOperation, drive.DriveError) as error:
             db().rollback()
-            flash(str(error) if isinstance(error, ValueError) else "Ingresá un precio válido.")
-    return render_template("edit_product.html", product=product)
+            flash(str(error) if isinstance(error, (ValueError,drive.DriveError)) else "Ingresá un precio válido.")
+    return render_template("edit_product.html", product=product, drive_file_id=drive_file_id,
+                           drive_image_id=drive_image_id, selected_file=selected_file, selected_image=selected_image)
 
 @main.get("/admin/pedidos/<int:identifier>")
 @admin_required

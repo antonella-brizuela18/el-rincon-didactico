@@ -8,6 +8,7 @@ Tienda Python/Flask para Alwaysdata y PostgreSQL. Conserva el proyecto original;
 - Catálogo paginado con filtros conservados; ya no se ocultan recursos por un límite fijo de resultados.
 - Administración con contraseñas hasheadas, sesiones, CSRF y límite de intentos de acceso.
 - Productos digitales y físicos, borradores/publicación, precios ARS, stock, fotos normalizadas.
+- Importación administrativa desde una carpeta privada de Drive y sus subcarpetas: PDF/ZIP, portadas JPG/PNG/WebP y documentos de Google exportados a PDF. Copia privada al guardar; no escribe en Drive ni cambia sus permisos.
 - Vista previa privada de borradores y acciones para publicar/ocultar desde el listado. La publicación digital exige un archivo disponible.
 - Carrito y pedidos persistidos con precios calculados en el servidor. Confirmación idempotente.
 - Cantidades editables de materiales físicos y actualización del carrito si se oculta un recurso o cambia el stock.
@@ -72,6 +73,22 @@ Configurar SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM y SMTP_SSL.
 Programar flask --app wsgi send-mail cada minuto en Alwaysdata usando el mismo virtualenv y entorno. Procesa hasta 20 correos por ejecución. Tras cinco fallos un correo requiere revisión de la cola. No se han enviado correos reales durante el desarrollo.
 
 La entrega es al menos una vez: una caída entre la aceptación del SMTP y el registro local puede repetir un mensaje. Los enlaces privados no deben aparecer en logs, analíticas ni repositorios. El encabezado Referrer-Policy impide enviarlos como referencia a Mercado Pago.
+
+## Importación desde Google Drive
+
+La tienda y el plugin de Drive de ChatGPT tienen conexiones diferentes. La conexión del plugin no entrega sus credenciales a Alwaysdata. La integración del servidor usa una cuenta de servicio de Google con alcance drive.readonly y la carpeta elegida compartida como Lector.
+
+1. En Google Cloud crear o seleccionar un proyecto, habilitar Google Drive API y crear una cuenta de servicio. No necesita roles de edición del proyecto para leer una carpeta que le compartas.
+2. Descargar una clave JSON de esa cuenta y guardarla en el servidor en /home/elrincondidactico/.config/el-rincon-didactico/google-drive-service-account.json. Transferirla mediante SFTP/SCP. Nunca subir la clave al repositorio, al catálogo ni al chat.
+3. Compartir la carpeta de recursos con el correo de la cuenta de servicio como Lector. No es necesario abrirla a cualquier persona con el enlace. No compartir otras carpetas con esa cuenta si no hace falta.
+4. Activar el virtualenv e instalar requirements.txt. Desde el proyecto ejecutar python -m deploy.configure_drive. El asistente valida la credencial, guarda su ruta y el ID de la carpeta en la configuración privada y conserva SECRET_KEY, PostgreSQL y el resto de ajustes. Carpeta inicial: 1oRYvQe1MuIxy1R-ehYilne_LVIOXKpbl.
+5. Reiniciar el sitio. En Administración → Importar desde Drive, explorar la carpeta/subcarpetas, elegir el recurso y completar descripción/precio antes de guardar. Para adjuntar luego una portada de Drive, guardar primero el recurso y volver a editarlo.
+
+La tienda verifica que cada archivo pertenece a esa carpeta o a una subcarpeta (hasta 20 niveles). No resuelve accesos directos de Drive. Admite archivos digitales de hasta 20 MB y portadas de hasta 5 MB; la exportación de documentos de Google está además sujeta al límite de 10 MB de su API. Las imágenes se vuelven a codificar y los PDF/ZIP pasan la misma validación que una carga local.
+
+Importar crea una copia independiente: si después cambiás el original de Drive, el producto no se actualiza automáticamente. Seleccionar de nuevo un archivo al editarlo permite importar la nueva versión; los pedidos anteriores conservan su archivo. La descarga del cliente sigue requiriendo pago acreditado y no muestra un enlace público al original de Drive.
+
+La integración se probó con respuestas simuladas de Google. Falta configurar la credencial real y comprobar un archivo real de la carpeta; no se copiaron recursos reales durante el desarrollo.
 
 ## Desarrollo y pruebas
 

@@ -16,7 +16,7 @@
   <div class="notice onboarding-note"><strong>Tu tienda está lista para su primer recurso.</strong><p>Cargá una descripción, precio y foto. Si es digital, adjuntá el PDF o ZIP. Podés guardarlo como borrador y revisar la vista previa antes de publicarlo.</p><a class="button small" href="{{ url_for('main.edit_product') }}">Cargar mi primer recurso</a></div>
   {% endif %}
   <section id="mis-recursos">
-    <div class="section-heading"><h2>Mis recursos</h2><a class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div>
+    <div class="section-heading"><h2>Mis recursos</h2><div class="resource-toolbar"><a class="button small secondary-button" href="{{ url_for('main.drive_browser') }}">Importar desde Drive</a><a class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
     <form class="filters admin-filters" method="get" action="{{ url_for('main.admin') }}#mis-recursos">
       <input type="hidden" name="pedido" value="{{ order_q }}"><input type="hidden" name="estado" value="{{ status }}">
       <label>Buscar recurso<input type="search" name="recurso" value="{{ resource_q }}" placeholder="Título o categoría"></label>

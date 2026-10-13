@@ -34,6 +34,8 @@ def create_app(config=None):
         SMTP_PASSWORD=os.environ.get("SMTP_PASSWORD", ""),
         SMTP_FROM=os.environ.get("SMTP_FROM", ""),
         SMTP_SSL=os.environ.get("SMTP_SSL", "1")=="1",
+        GOOGLE_DRIVE_FOLDER_ID=os.environ.get("GOOGLE_DRIVE_FOLDER_ID", "1oRYvQe1MuIxy1R-ehYilne_LVIOXKpbl"),
+        GOOGLE_DRIVE_CREDENTIALS=os.environ.get("GOOGLE_DRIVE_CREDENTIALS", ""),
         TRUSTED_HOSTS=[host.strip() for host in os.environ.get("TRUSTED_HOSTS", "").split(",") if host.strip()] or None,
     )
     if config:
@@ -57,6 +59,9 @@ def create_app(config=None):
         connection = g.pop("db", None)
         if connection is not None:
             connection.close()
+        drive_connection = g.pop("drive_session", None)
+        if drive_connection is not None:
+            drive_connection.close()
 
     @app.template_filter("money")
     def money(cents):
