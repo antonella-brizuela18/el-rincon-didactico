@@ -3,8 +3,8 @@ import os
 from datetime import timedelta
 from pathlib import Path
 import click
-from flask import Flask, g
-from flask_wtf.csrf import CSRFProtect
+from flask import Flask, g, render_template
+from flask_wtf.csrf import CSRFError, CSRFProtect
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from werkzeug.security import generate_password_hash
@@ -65,7 +65,8 @@ def create_app(config=None):
     @app.after_request
     def security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "no-referrer"
+        # HTTPS CSRF validation needs a same-origin Referer; external links must not receive private URLs.
+        response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         if app.config["SESSION_COOKIE_SECURE"]:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
@@ -76,6 +77,9 @@ def create_app(config=None):
     from app.models import Admin, Base
     from app.routes import main
     app.register_blueprint(main)
+    @app.errorhandler(CSRFError)
+    def csrf_error(error):
+        return render_template("message.html", title="Volvé a abrir el formulario", message="No pudimos validar el envío. Recargá la página e intentá otra vez. Si estabas ingresando, abrí nuevamente el acceso de administración."), 400
     from app.notifications import send_mail_command
     app.cli.add_command(send_mail_command)
 

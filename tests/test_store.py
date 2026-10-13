@@ -238,5 +238,18 @@ def test_headers_and_xss_escaping(app, client):
     assert b"<script>" not in page.data
     assert b"&lt;script&gt;" in page.data
     assert page.headers["X-Content-Type-Options"] == "nosniff"
-    assert page.headers["Referrer-Policy"] == "no-referrer"
+    assert page.headers["Referrer-Policy"] == "same-origin"
+
+
+def test_https_login_requires_token_and_same_origin_referrer(app, client):
+    app.config["WTF_CSRF_ENABLED"] = True
+    page = client.get("/admin/login", base_url="https://localhost")
+    assert page.headers["Referrer-Policy"]=="same-origin"
+    token = re.search(rb'name="csrf_token" value="([^"]+)"', page.data).group(1).decode()
+    data={"email":"admin@example.test", "password":"test-password-123", "csrf_token":token}
+    assert client.post("/admin/login", base_url="https://localhost", data=data).status_code==400
+    assert client.post("/admin/login", base_url="https://localhost", data=data, headers={"Referer":"https://other.example/login"}).status_code==400
+    response=client.post("/admin/login", base_url="https://localhost", data=data, headers={"Referer":"https://localhost/admin/login"})
+    assert response.status_code==302
+    assert client.get("/admin", base_url="https://localhost").status_code==200
     assert "frame-ancestors 'none'" in page.headers["Content-Security-Policy"]
