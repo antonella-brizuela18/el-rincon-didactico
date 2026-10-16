@@ -279,3 +279,22 @@ Para reducir pedidos de recursos se sirve un único `/ui.css?v=HASH`. CSS y JS c
 En móvil (hasta 760 px): menú inferior con área segura, controles de al menos 44–48 px, inputs de 16 px, encabezados/portada/footer centrados, una columna de catálogo, CTA de ancho completo, tablas administrativas con desplazamiento local y guardado en el flujo. El enlace Administración tiene tamaño y contraste explícitos. WhatsApp se muestra dentro del contenido en móvil; no flota sobre el carrito/footer. El aviso de privacidad deja espacio para la navegación inferior. Respeta reduced-motion.
 
 Verificación: Python prueba rutas/CSRF/cache/markup; Node (`node --test tests/navigation.test.cjs`) prueba history, formularios y submitter, errores sin duplicación, salida nativa a pagos, nueva versión y cancelación de navegaciones. Los mocks de DOM no reemplazan la comprobación visual en navegadores reales. El navegador de revisión no admite archivos locales ni cambio de viewport; la revisión en dispositivos físicos sigue siendo necesaria para diferencias de navegador/teclado.
+# Gestión de catálogo e integraciones
+
+En **Administración → Recursos**, Nuevo recurso y Editar abren el mismo modal
+con validación en el servidor y respaldo como página independiente. La selección
+de Drive ocurre dentro del formulario y conserva los datos y archivos locales.
+Drive solo aporta el archivo o portada; el operador completa el resto.
+
+El botón **Crear productos de ejemplo** crea seis borradores una sola vez.
+También se puede ejecutar `flask --app wsgi seed-examples`. Los precios son
+orientativos y no incluyen archivos de venta ni medidas inventadas. Revisarlos
+antes de publicar. No altera los recursos existentes.
+
+**Administración → Integraciones** muestra el estado de Mercado Pago, MiCorreo,
+Drive y SMTP sin revelar claves. Permite verificar la cuenta vendedora y la
+carpeta mediante consultas de lectura, sin generar pagos ni correos.
+MiCorreo necesita credenciales API oficiales, Customer ID y medidas reales del
+paquete. El origen predeterminado es **8000, Bahía Blanca**, configurable.
+El cotizador está disponible en cada producto físico (una unidad) y en el cierre
+del pedido (carrito completo). No cobra el envío ni genera etiquetas.

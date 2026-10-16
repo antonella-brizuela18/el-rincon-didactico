@@ -1209,3 +1209,4 @@ body[data-mode="dark"] .r-app {
   --r-lime: #38432e;
 }
 .r-summary { align-self: start; }
+.r-shipping-estimator{border:1px solid var(--r-border);border-radius:16px;padding:18px;margin:16px 0 24px;font-size:.85rem}.r-shipping-estimator summary{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;list-style:none}.r-shipping-estimator form label{display:block;margin-bottom:8px}.r-shipping-estimator form>div{display:flex;gap:10px}.r-shipping-estimator input{min-width:0;flex:1;width:100%;padding:12px;border:1px solid var(--r-border);border-radius:10px;background:transparent;color:inherit}.r-shipping-estimator ul{padding:0;list-style:none}.r-shipping-estimator li{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--r-border)}.r-shipping-estimator small{line-height:1.7;color:var(--r-muted)}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import pager with context %}
 {% block title %}Mi tienda · Administración{% endblock %}
+{% block head %}<script src="{{ url_for('static',filename='admin-products.js') }}" defer></script>{% endblock %}
 {% block content %}
 <section class="section">
   <div class="section-heading">
@@ -17,7 +18,8 @@
   {% endif %}
   <div class="release-status"><span class="status-dot" aria-hidden="true"></span><p><strong>Versión de la tienda</strong><br><code>{{ config.APP_REVISION[:12] }}</code> · <a href="https://github.com/antonella-brizuela18/el-rincon-didactico/actions" target="_blank" rel="noopener">Ver actualizaciones</a></p></div>
   <section id="mis-recursos">
-    <div class="section-heading"><h2>Mis recursos</h2><div class="resource-toolbar"><a class="button small secondary-button" href="{{ url_for('main.drive_browser') }}">Importar desde Drive</a><a class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Tu biblioteca</p><h2>Mis recursos</h2><p class="muted">Creá, revisá y publicá desde una sola lista.</p></div><div class="resource-toolbar"><a data-product-modal data-open-drive href="{{ url_for('main.edit_product') }}" class="button small secondary-button">Importar desde Drive</a><a data-product-modal class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
+    <details class="sample-products"><summary>¿Querés probar la gestión con productos de ejemplo?</summary><p>Creá seis borradores editables, con precios orientativos. No se publican ni incluyen archivos de venta; completalos antes de ofrecerlos.</p><form method="post" action="{{ url_for('catalog_tools.samples') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small secondary-button">Crear productos de ejemplo</button></form></details>
     <form class="filters admin-filters" method="get" action="{{ url_for('main.admin') }}#mis-recursos">
       <input type="hidden" name="pedido" value="{{ order_q }}"><input type="hidden" name="estado" value="{{ status }}">
       <label>Buscar recurso<input type="search" name="recurso" value="{{ resource_q }}" placeholder="Título o categoría"></label>
@@ -35,7 +37,7 @@
         <td>{{ 'Descargable' if product.kind=='digital' else 'Hecho a pedido' }}</td>
         <td><span class="status-pill {{ 'status-published' if product.published else 'status-draft' }}">{{ 'Publicado' if product.published else 'Borrador' }}</span></td>
         <td><div class="row-actions">
-          <a href="{{ url_for('main.edit_product', identifier=product.id) }}">Editar</a>
+          <a data-product-modal href="{{ url_for('main.edit_product', identifier=product.id) }}">Editar</a>
           <a href="{{ url_for('main.preview_product', identifier=product.id) }}">Vista previa</a>
           <form method="post" action="{{ url_for('main.publish_product', identifier=product.id, action='ocultar' if product.published else 'publicar') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -66,4 +68,5 @@
     {{ pager(order_pages, 'main.admin', 'pedidos_pagina', 'mis-pedidos') }}
   </section>
 </section>
+<dialog class="product-modal" aria-labelledby="product-modal-title"><header><div><p class="eyebrow">Tu biblioteca de materiales</p><h2 id="product-modal-title">Nuevo recurso</h2></div><button type="button" class="text-button" data-product-close aria-label="Cerrar formulario">Cerrar ×</button></header><div data-product-body></div></dialog>
 {% endblock %}

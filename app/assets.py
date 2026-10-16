@@ -15,7 +15,7 @@ def ui():
 
 def register(app):
     root=Path(app.static_folder)
-    content='\n'.join((root/name).read_text() for name in ('style.css','studio.css','experience.css','commerce.css','mobile.css'))
+    content='\n'.join((root/name).read_text() for name in ('style.css','studio.css','experience.css','commerce.css','mobile.css','admin-products.css'))
     version=hashlib.sha256(content.encode()).hexdigest()[:16]
     app.extensions['ui_bundle']=(content,version)
     app.extensions['ui_gzip']=gzip.compress(content.encode(),compresslevel=6,mtime=0)

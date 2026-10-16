@@ -423,6 +423,18 @@ def admin():
                            resource_q=resource_q, visibility=visibility, order_q=order_q, status=status)
 
 
+@main.get('/admin/drive/archivos')
+@admin_required
+def drive_picker():
+    if not drive.configured():
+        return jsonify(error='Falta conectar la carpeta de Drive. Revisá Integraciones en el panel.'),422
+    try:
+        folder, files, token = drive.list_folder(request.args.get('folder',''), request.args.get('token',''), request.args.get('search','').strip()[:100])
+        return jsonify(folder=dict(id=folder['id'],name=folder['name']), root=current_app.config['GOOGLE_DRIVE_FOLDER_ID'],
+                       files=[dict(id=f['id'],name=f['name'],kind='folder' if f['mimeType']==drive.FOLDER_MIME else 'image' if f['mimeType'] in drive.IMAGE_MIMES else 'resource') for f in files if f['mimeType'] in drive.RESOURCE_MIMES | drive.IMAGE_MIMES | {drive.FOLDER_MIME}], token=token)
+    except drive.DriveError as error:
+        return jsonify(error=str(error)),422
+
 @main.get("/admin/drive")
 @admin_required
 def drive_browser():
@@ -522,9 +534,6 @@ def edit_product(identifier=None):
                 selected_file=drive.permitted_metadata(drive_file_id)
                 if selected_file.get("mimeType") not in drive.RESOURCE_MIMES:
                     raise drive.DriveError("Ese archivo no puede usarse como recurso descargable.")
-                if not identifier:
-                    product.title=Path(selected_file["name"]).stem[:160]
-                    product.category="Recursos didácticos"
             if drive_image_id:
                 selected_image=drive.permitted_metadata(drive_image_id)
                 if selected_image.get("mimeType") not in drive.IMAGE_MIMES:
@@ -581,12 +590,16 @@ def edit_product(identifier=None):
                 parcel = db().get(Parcel, product.id)
                 if parcel: db().delete(parcel)
             db().commit()
+            if request.headers.get('X-Product-Modal')=='1':
+                return jsonify(saved=True)
             flash("Recurso guardado.")
             return redirect(url_for("main.admin"))
         except (ValueError, InvalidOperation, drive.DriveError) as error:
             db().rollback()
+            if request.headers.get('X-Product-Modal')=='1':
+                return jsonify(error=str(error) if isinstance(error,(ValueError,drive.DriveError)) else 'Ingresá un precio válido.'),422
             flash(str(error) if isinstance(error, (ValueError,drive.DriveError)) else "Ingresá un precio válido.")
-    return render_template("edit_product.html", product=product, parcel=db().get(Parcel, product.id) if product.id else None, drive_file_id=drive_file_id,
+    return render_template("_product_form.html" if request.args.get('modal')=='1' else "edit_product.html", product=product, parcel=db().get(Parcel, product.id) if product.id else None, drive_file_id=drive_file_id,
                            drive_image_id=drive_image_id, selected_file=selected_file, selected_image=selected_image)
 
 @main.get("/admin/pedidos/<int:identifier>")

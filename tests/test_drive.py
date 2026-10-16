@@ -69,7 +69,7 @@ def test_browse_subfolders_and_resource_selection(client, mock_drive):
     selected=client.get("/admin/productos/nuevo?drive_file=pdf")
     assert selected.status_code==200
     assert b'name="drive_file" value="pdf"' in selected.data
-    assert b'value="Juego"' in selected.data
+    assert b'value="Juego"' not in selected.data  # Drive supplies only the file, never catalog metadata.
 
 
 def test_save_imported_pdf_keeps_file_private(app, client, mock_drive):

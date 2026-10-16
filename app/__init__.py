@@ -126,6 +126,13 @@ def create_app(config=None):
     register_storefront(app)
     from app.shipping import shipping
     app.register_blueprint(shipping)
+    from app.catalog_tools import catalog_tools
+    app.register_blueprint(catalog_tools)
+    @app.cli.command('seed-examples')
+    def seed_examples():
+        """Create six editable drafts once; never publishes example products."""
+        from app.catalog_tools import create_samples
+        click.echo('Seis borradores creados.' if create_samples() else 'Los ejemplos ya existen.')
     @app.errorhandler(CSRFError)
     def csrf_error(error):
         return render_template("message.html", title="Volvé a abrir el formulario", message="No pudimos validar el envío. Recargá la página e intentá otra vez. Si estabas ingresando, abrí nuevamente el acceso de administración."), 400

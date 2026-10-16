@@ -514,6 +514,32 @@ function Shop({ home = false }: { home?: boolean }) {
     </>
   );
 }
+export function ShippingEstimator({productId, csrf, origin, days}: {productId:number; csrf:string; origin:string; days:string}) {
+  const [postal, setPostal] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [rates, setRates] = useState<{name:string; delivery:string; cents:number}[]>([]);
+  async function estimate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); if (busy) return;
+    setBusy(true); setMessage('Consultando MiCorreo…'); setRates([]);
+    const data = new FormData(); data.set('product_id', String(productId)); data.set('postal_code', postal);
+    try {
+      const result = await request<{rates:{name:string; delivery:string; cents:number}[]; test:boolean}>('/envios/cotizar', csrf, data);
+      setRates(result.rates);
+      setMessage(result.test ? 'PRUEBA — estos valores no son tarifas reales.' : 'Estimación para una unidad. El envío se abona por separado.');
+    } catch (error) {setMessage(error instanceof Error ? error.message : 'No pudimos cotizar. Consultanos por WhatsApp.');}
+    finally {setBusy(false);}
+  }
+  return <details className="r-shipping-estimator"><summary><Package size={18}/> Calculá tu envío</summary>
+    <p>Desde Bahía Blanca ({origin}). Preparación aproximada: {days} días desde el pago, más el traslado.</p>
+    <form onSubmit={estimate}><label htmlFor={`shipping-postal-${productId}`}>Código postal de destino</label>
+      <div><input id={`shipping-postal-${productId}`} value={postal} onChange={e=>{setPostal(e.target.value.toUpperCase());setMessage('');setRates([]);}} required maxLength={8} pattern="([0-9]{4}|[A-Za-z][0-9]{4}[A-Za-z]{3})" placeholder="Ej. 1425" autoComplete="postal-code"/>
+      <button className="r-button r-secondary" disabled={busy}>{busy ? 'Consultando…' : 'Calcular'}</button></div></form>
+    <p role="status">{message}</p>
+    {!!rates.length && <ul>{rates.map((rate,i)=><li key={i}><span>{rate.name} · {rate.delivery}</span><strong>{money(rate.cents)}</strong></li>)}</ul>}
+    <small>La coordinación del despacho se hace por WhatsApp. Para varias unidades, calculá el pedido completo al finalizar la compra.</small>
+  </details>;
+}
 function ProductPage() {
   const b = useBoot(),
     location = useLocation(),
@@ -603,6 +629,7 @@ function ProductPage() {
                 : `Preparación aproximada: ${b.store.preparation_days} días desde el pago. ${b.store.delivery_note}`}
             </span>
           </div>
+          {p.kind === 'physical' && <ShippingEstimator key={p.id} productId={p.id} csrf={b.csrf} origin={b.store.shipping_origin} days={b.store.preparation_days}/>}
           <button
             className="r-button"
             disabled={actions.isPending}

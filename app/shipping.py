@@ -3,7 +3,7 @@ from decimal import Decimal, InvalidOperation
 import re
 import requests
 from flask import Blueprint, current_app, jsonify, request, session
-from app.models import Parcel
+from app.models import Parcel, Product
 from app.routes import cart_rows, db
 from app.studio import settings
 
@@ -61,6 +61,16 @@ def rates():
         return jsonify(error='Ingresá un código postal argentino válido.'),400
     session['shipping_last'] = stamp
     try:
-        return jsonify(quote(cart_rows(),destination))
+        if request.form.get('product_id'):
+            product=db().get(Product,request.form.get('product_id',type=int))
+            quantity=request.form.get('quantity',1,type=int)
+            if not product or not product.published or product.kind!='physical' or quantity is None or not 1<=quantity<=10:
+                return jsonify(error='Elegí un material físico publicado y entre 1 y 10 unidades.'),400
+            rows=[(product,quantity)]
+        else:
+            rows=cart_rows()
+        result=quote(rows,destination)
+        result.update(origin=settings()['shipping_origin'],preparation_days=int(settings()['preparation_days']))
+        return jsonify(result)
     except ShippingError as error:
         return jsonify(error=str(error)),422
