@@ -30,3 +30,12 @@ siempre vuelve a borrador. Duplicar conserva portada, archivo y paquete, con
 publicación desactivada. La tabla de archivados se instala con `init-db` sin
 alterar columnas existentes. El despliegue ejecuta `seed-examples` una sola vez
 por tienda mediante su marcador persistente; los seis ejemplos son borradores.
+
+Revisión de octubre: tipografía de lectura clara, superficies neutras y un solo
+acento de marca. Íconos Lucide con trazo consistente; sin flores decorativas ni
+portadas de ejemplo ampliadas en el hero. El hero de respaldo explica formatos
+y permite entrar al catálogo. Las fotos y el logo personalizados se conservan.
+Las mutaciones del carrito muestran progreso, éxito o error en una notificación
+persistente al navegar; el botón accionado cambia de estado. Los filtros anuncian
+la actualización sin desplazar al visitante. Guardar en administración muestra
+progreso y confirma el resultado al volver a la grilla. Respetar movimiento reducido.

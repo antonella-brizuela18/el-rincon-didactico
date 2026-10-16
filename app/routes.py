@@ -613,6 +613,7 @@ def edit_product(identifier=None):
                 if parcel: db().delete(parcel)
             db().commit()
             if request.headers.get('X-Product-Modal')=='1':
+                flash('Recurso guardado correctamente.')
                 return jsonify(saved=True)
             flash("Recurso guardado.")
             return redirect(url_for("main.admin"))
