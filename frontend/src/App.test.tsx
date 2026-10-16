@@ -195,6 +195,20 @@ describe("cached storefront navigation", () => {
     expect(screen.getByRole("button", { name: /Crear pedido/ })).toBeTruthy();
   });
 });
+describe("catalog category shortcuts", () => {
+  it("filters by category and clears both filters and the search field", async () => {
+    mount();
+    client.setQueryData(["catalog", "categoria=Colores"], { ...boot.catalog, products: [p], total: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Colores" }));
+    expect(await screen.findByRole("button", { name: "Colores", pressed: true })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Juego de tela" })).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText("¿Qué te gustaría encontrar?"), { target: { value: "otra idea" } });
+    fireEvent.click(screen.getByRole("button", { name: "Limpiar filtros ×" }));
+    expect((screen.getByPlaceholderText("¿Qué te gustaría encontrar?") as HTMLInputElement).value).toBe("");
+    expect(await screen.findByRole("heading", { name: "Juego de tela" })).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
 describe("cart limits", () => {
   it("keeps digital quantity at one and physical quantity at ten", () => {
     expect(

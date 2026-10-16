@@ -28,6 +28,12 @@ class Product(Base):
     digital_file = Column(String(80))
     created_at = Column(DateTime, nullable=False, default=now)
 
+class ProductArchive(Base):
+    """Separate table keeps schema installation additive on existing stores."""
+    __tablename__ = "product_archives"
+    product_id = Column(Integer, ForeignKey("products.id"), primary_key=True)
+    archived_at = Column(DateTime, nullable=False, default=now)
+
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True)

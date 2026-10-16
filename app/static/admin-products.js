@@ -1,6 +1,9 @@
 /* Progressive enhancement: the same validated form works with or without a dialog. */
 (() => {
   'use strict';
+  document.querySelectorAll('[data-archive-confirm]').forEach(form => form.addEventListener('submit', event => {
+    if (!confirm('¿Archivar este recurso? Dejará de aparecer en la tienda. Podés restaurarlo después; los pedidos conservan sus archivos.')) event.preventDefault();
+  }));
   const modal = document.querySelector('.product-modal');
   let opener, dirty = false, saving = false, opening;
   const button = (text, action) => {

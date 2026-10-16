@@ -15,7 +15,7 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
-from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, Parcel, Product, Fulfillment, OrderPayment, now
+from app.models import Admin, LoginAttempt, Order, OrderItem, OrderContact, Parcel, Product, ProductArchive, Fulfillment, OrderPayment, now
 from app import csrf
 from app.payments import PaymentError, mp_configured, mp_ready, payment_methods, mp_request, valid_signature
 from app.notifications import enqueue_mail
@@ -398,7 +398,10 @@ def admin():
     visibility = request.args.get("visibilidad", "")
     order_q = request.args.get("pedido", "").strip()[:100]
     status = request.args.get("estado", "")
-    products_query = select(Product)
+    archived_ids = select(ProductArchive.product_id)
+    products_query = select(Product).where(
+        Product.id.in_(archived_ids) if visibility=="archived" else Product.id.not_in(archived_ids)
+    )
     if resource_q:
         products_query = products_query.where(Product.title.icontains(resource_q, autoescape=True) | Product.category.icontains(resource_q, autoescape=True))
     if visibility in ("published", "draft"):
@@ -474,7 +477,20 @@ def publish_product(identifier, action):
     product = db().scalar(select(Product).where(Product.id==identifier).with_for_update())
     if not product:
         abort(404)
-    if action=="publicar":
+    if action=="archivar":
+        if not db().get(ProductArchive, identifier):
+            db().add(ProductArchive(product_id=identifier))
+        product.published = False
+        message = "Recurso archivado. Podés restaurarlo desde Archivados; los pedidos conservan sus archivos."
+    elif action=="restaurar":
+        archived = db().get(ProductArchive, identifier)
+        if archived:
+            db().delete(archived)
+        product.published = False
+        message = "Recurso restaurado como borrador."
+    elif db().get(ProductArchive, identifier):
+        abort(409, description="Restaurá el recurso antes de publicarlo o modificarlo.")
+    elif action=="publicar":
         if product.kind=="digital" and (not product.digital_file or not (Path(current_app.config["STORAGE_DIR"])/"private"/product.digital_file).is_file()):
             flash("Adjuntá un archivo digital disponible antes de publicar este recurso.")
             return redirect(url_for("main.edit_product", identifier=identifier))
@@ -484,7 +500,7 @@ def publish_product(identifier, action):
     else:
         abort(400)
     db().commit()
-    flash("Recurso publicado." if product.published else "Recurso ocultado; los pedidos anteriores conservan sus archivos.")
+    flash(message if action in ("archivar", "restaurar") else "Recurso publicado." if product.published else "Recurso ocultado; los pedidos anteriores conservan sus archivos.")
     return redirect(url_for("main.admin"))
 
 def save_image(upload):
@@ -521,9 +537,15 @@ def save_digital(upload):
 @main.route("/admin/productos/<int:identifier>", methods=["GET", "POST"])
 @admin_required
 def edit_product(identifier=None):
-    product = db().get(Product, identifier) if identifier else Product(published=False, kind="digital", stock=0)
+    if identifier:
+        query = select(Product).where(Product.id==identifier)
+        product = db().scalar(query.with_for_update() if request.method=="POST" else query)
+    else:
+        product = Product(published=False, kind="digital", stock=0)
     if product is None:
         abort(404)
+    if identifier and db().get(ProductArchive, identifier):
+        abort(409, description="Restaurá este recurso antes de editarlo.")
     drive_file_id=(request.form if request.method=="POST" else request.args).get("drive_file", "")
     drive_image_id=(request.form if request.method=="POST" else request.args).get("drive_image", "")
     selected_file=None

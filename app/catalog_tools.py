@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from PIL import Image, ImageDraw
 from sqlalchemy import select
 from app.routes import admin_required, db
-from app.models import Product
+from app.models import Product, ProductArchive, Parcel
 from app import drive
 from app.payments import mp_ready, mp_request, PaymentError
 
@@ -89,3 +89,28 @@ def verify():
     else:
         flash('Elegí una conexión válida.')
     return redirect(url_for('catalog_tools.integrations'))
+
+
+@catalog_tools.post('/admin/productos/<int:identifier>/duplicar')
+@admin_required
+def duplicate(identifier):
+    from flask import abort
+    original = db().scalar(select(Product).where(Product.id==identifier).with_for_update())
+    if not original:
+        abort(404)
+    if db().get(ProductArchive, identifier):
+        abort(409)
+    # Stored files are immutable; each edit creates a new filename, preserving orders and copies.
+    copy = Product(title=(original.title[:152] + ' (copia)'), description=original.description,
+                   category=original.category, age=original.age, kind=original.kind,
+                   price_cents=original.price_cents, stock=0, published=False,
+                   image=original.image, digital_file=original.digital_file)
+    db().add(copy)
+    db().flush()
+    parcel = db().get(Parcel, identifier)
+    if parcel:
+        db().add(Parcel(product_id=copy.id, weight=parcel.weight, height=parcel.height,
+                       width=parcel.width, length=parcel.length))
+    db().commit()
+    flash('Copia creada como borrador. Revisá los datos antes de publicarla.')
+    return redirect(url_for('main.edit_product', identifier=copy.id))
