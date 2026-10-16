@@ -72,6 +72,7 @@ def main(sha, directory):
             unpack_frontend(FRONTEND_BUNDLE,frontend,sha)
             run([sys.executable,'-m','pip','install','-r',str(stage/'requirements.txt')],stage)
             run([sys.executable,'-m','flask','--app',str(stage/'deploy/wsgi.py'),'init-db'],stage,env=env)
+            run([sys.executable,'-m','flask','--app',str(stage/'deploy/wsgi.py'),'seed-examples'],stage,env=env)
             run([sys.executable,'-m','compileall','-q',str(stage/'app')],stage)
             git('update-ref','refs/deploy/previous',previous)
             git('merge','--ff-only',sha)

@@ -304,7 +304,7 @@ function Shop({ home = false }: { home?: boolean }) {
               </Link>
             ) : (
               <>
-                <Flower2 size={140} strokeWidth={1} />
+                <div className="r-play-shapes" aria-hidden="true"><span>Aa</span><span><Flower2 size={70} strokeWidth={1.5} /></span><span>1 2 3</span></div>
                 <h2>
                   El juego es
                   <br />
@@ -405,8 +405,14 @@ function Shop({ home = false }: { home?: boolean }) {
             </select>
           </label>
         </form>
+        {b.store.show_categories === "1" && b.categories.length > 0 && (
+          <nav className="r-category-chips" aria-label="Explorar categorías">
+            <button aria-pressed={!params.get("categoria")} onClick={() => setFilter("categoria", "")}>Todas las ideas</button>
+            {b.categories.map(category => <button key={category} aria-pressed={params.get("categoria") === category} onClick={() => setFilter("categoria", category)}>{category}</button>)}
+          </nav>
+        )}
         {searchKey && (
-          <button className="r-text-link" onClick={() => setParams({})}>
+          <button className="r-text-link" onClick={() => { setSearch(""); setParams({}); }}>
             Limpiar filtros ×
           </button>
         )}

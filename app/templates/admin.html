@@ -18,36 +18,41 @@
   {% endif %}
   <div class="release-status"><span class="status-dot" aria-hidden="true"></span><p><strong>Versión de la tienda</strong><br><code>{{ config.APP_REVISION[:12] }}</code> · <a href="https://github.com/antonella-brizuela18/el-rincon-didactico/actions" target="_blank" rel="noopener">Ver actualizaciones</a></p></div>
   <section id="mis-recursos">
-    <div class="section-heading"><div><p class="eyebrow">Tu biblioteca</p><h2>Mis recursos</h2><p class="muted">Creá, revisá y publicá desde una sola lista.</p></div><div class="resource-toolbar"><a data-product-modal data-open-drive href="{{ url_for('main.edit_product') }}" class="button small secondary-button">Importar desde Drive</a><a data-product-modal class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Tu biblioteca</p><h2>Mis recursos</h2><p class="muted">Creá, revisá y publicá desde tu biblioteca. Archivá lo que ya no ofrecés y recuperalo cuando quieras.</p></div><div class="resource-toolbar"><a data-product-modal data-open-drive href="{{ url_for('main.edit_product') }}" class="button small secondary-button">Importar desde Drive</a><a data-product-modal class="button small" href="{{ url_for('main.edit_product') }}">+ Nuevo recurso</a></div></div>
     <details class="sample-products"><summary>¿Querés probar la gestión con productos de ejemplo?</summary><p>Creá seis borradores editables, con precios orientativos. No se publican ni incluyen archivos de venta; completalos antes de ofrecerlos.</p><form method="post" action="{{ url_for('catalog_tools.samples') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small secondary-button">Crear productos de ejemplo</button></form></details>
     <form class="filters admin-filters" method="get" action="{{ url_for('main.admin') }}#mis-recursos">
       <input type="hidden" name="pedido" value="{{ order_q }}"><input type="hidden" name="estado" value="{{ status }}">
       <label>Buscar recurso<input type="search" name="recurso" value="{{ resource_q }}" placeholder="Título o categoría"></label>
-      <label>Visibilidad<select name="visibilidad"><option value="">Todos</option><option value="published" {% if visibility=='published' %}selected{% endif %}>Publicados</option><option value="draft" {% if visibility=='draft' %}selected{% endif %}>Borradores</option></select></label>
+      <label>Visibilidad<select name="visibilidad"><option value="">Activos</option><option value="archived" {% if visibility=='archived' %}selected{% endif %}>Archivados</option><option value="published" {% if visibility=='published' %}selected{% endif %}>Publicados</option><option value="draft" {% if visibility=='draft' %}selected{% endif %}>Borradores</option></select></label>
       <button class="button">Filtrar</button>
     </form>
     <p class="muted">{{ product_pages.total }} recursos encontrados</p>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Recurso</th><th>Precio</th><th>Disponibilidad</th><th>Estado</th><th>Acciones</th></tr></thead>
-      <tbody>
+    <div class="resource-grid">
       {% for product in products %}
-      <tr>
-        <td><div class="admin-product-label">{% if product.image %}<img class="admin-thumbnail" src="{{ url_for('main.image', filename=product.image) }}" alt="" width="48" height="48">{% endif %}<div><strong>{{ product.title }}</strong><small>{{ product.category }} · {{ 'Digital' if product.kind=='digital' else 'Físico' }}</small></div></div></td>
-        <td>{{ product.price_cents|money }}</td>
-        <td>{{ 'Descargable' if product.kind=='digital' else 'Hecho a pedido' }}</td>
-        <td><span class="status-pill {{ 'status-published' if product.published else 'status-draft' }}">{{ 'Publicado' if product.published else 'Borrador' }}</span></td>
-        <td><div class="row-actions">
-          <a data-product-modal href="{{ url_for('main.edit_product', identifier=product.id) }}">Editar</a>
-          <a href="{{ url_for('main.preview_product', identifier=product.id) }}">Vista previa</a>
-          <form method="post" action="{{ url_for('main.publish_product', identifier=product.id, action='ocultar' if product.published else 'publicar') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="text-button">{{ 'Ocultar' if product.published else 'Publicar' }}</button>
-          </form>
-        </div></td>
-      </tr>
-      {% else %}<tr><td colspan="5">No hay recursos con esos filtros.</td></tr>{% endfor %}
-      </tbody>
-    </table></div>
+      <article class="resource-card">
+        <a class="resource-cover" href="{{ url_for('main.preview_product', identifier=product.id) }}" aria-label="Vista previa de {{ product.title }}">
+          {% if product.image %}<img src="{{ url_for('main.image', filename=product.image) }}" alt="" width="480" height="360" loading="lazy">{% else %}<span class="resource-placeholder" aria-hidden="true">✿</span>{% endif %}
+          <span class="status-pill {{ 'status-published' if product.published else 'status-draft' }}">{{ 'Archivado' if visibility=='archived' else 'Publicado' if product.published else 'Borrador' }}</span>
+        </a>
+        <div class="resource-copy"><small>{{ product.category }} · {{ 'Digital' if product.kind=='digital' else 'Físico' }}</small><h3>{{ product.title }}</h3><p class="muted">{{ product.age or 'Sin edad definida' }}</p><strong class="resource-price">{{ product.price_cents|money }}</strong>
+        <p class="resource-file-note">{{ 'Archivo adjunto' if product.kind=='digital' and product.digital_file else 'Falta adjuntar archivo' if product.kind=='digital' else 'Hecho a pedido' }}</p>
+        <div class="resource-actions">
+          {% if visibility=='archived' %}
+          <form method="post" action="{{ url_for('main.publish_product', identifier=product.id, action='restaurar') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small">Restaurar borrador</button></form>
+          {% else %}
+          <a data-product-modal class="button small" href="{{ url_for('main.edit_product', identifier=product.id) }}">Editar</a>
+          <form method="post" action="{{ url_for('main.publish_product', identifier=product.id, action='ocultar' if product.published else 'publicar') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button small secondary-button">{{ 'Ocultar' if product.published else 'Publicar' }}</button></form>
+          {% endif %}
+        </div>
+        <details class="resource-more"><summary>Más opciones</summary><a href="{{ url_for('main.preview_product', identifier=product.id) }}">Vista previa</a>
+          {% if visibility!='archived' %}
+          <form method="post" action="{{ url_for('catalog_tools.duplicate', identifier=product.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button">Duplicar como borrador</button></form>
+          <form data-archive-confirm method="post" action="{{ url_for('main.publish_product', identifier=product.id, action='archivar') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button">Archivar recurso</button></form>
+          {% endif %}
+        </details></div>
+      </article>
+      {% else %}<div class="empty resource-empty"><h3>{{ 'Tu archivo está vacío' if visibility=='archived' else 'No encontramos recursos' }}</h3><p>{{ 'Los recursos que archives aparecerán acá. Podrás restaurarlos como borradores.' if visibility=='archived' else 'Probá otros filtros o creá un nuevo recurso para tu biblioteca.' }}</p></div>{% endfor %}
+    </div>
     {{ pager(product_pages, 'main.admin', 'recursos_pagina', 'mis-recursos') }}
   </section>
   <section id="mis-pedidos">
