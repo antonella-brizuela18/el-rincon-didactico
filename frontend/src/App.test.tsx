@@ -126,9 +126,11 @@ describe("cached storefront navigation", () => {
     );
     expect(
       screen
-        .getAllByRole("button", { name: /Agregar al carrito/ })[1]
+        .getAllByRole("button", { name: /Agregar al carrito/ })[0]
         .hasAttribute("disabled"),
     ).toBe(true);
+    expect(screen.getByRole("button", { name: "Agregando…" }).getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByText("Agregando al carrito")).toBeTruthy();
     resolve(
       new Response(
         JSON.stringify({
@@ -144,6 +146,10 @@ describe("cached storefront navigation", () => {
         125000,
       ),
     );
+    expect(await screen.findByText("Agregado a tu carrito")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Ver mi carrito/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar aviso" }));
+    expect(screen.queryByText("Agregado a tu carrito")).toBeNull();
     expect(vi.mocked(fetch).mock.calls[0][1]?.headers).toEqual(
       expect.objectContaining({ "X-CSRFToken": "csrf-test" }),
     );

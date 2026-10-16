@@ -25,7 +25,13 @@ import {
   ArrowRight,
   Check,
   ChevronLeft,
-  Flower2,
+  BookOpen,
+  Image as ImageIcon,
+  LoaderCircle,
+  CircleCheck,
+  CircleAlert,
+  SearchX,
+  X,
   House,
   ShoppingBag,
   Search,
@@ -51,14 +57,39 @@ import {
 } from "./api";
 const Context = createContext<Bootstrap>(null!);
 const useBoot = () => useContext(Context);
+type Feedback = { title: string; message: string; kind: "pending" | "success" | "error"; cart?: boolean };
+const FeedbackContext = createContext<(value: Feedback) => void>(() => {});
+function FeedbackProvider({ children }: { children: ReactNode }) {
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    if (!feedback || feedback.kind !== "success") return;
+    const timer = window.setTimeout(() => setFeedback(null), 7000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+  const show = (value: Feedback) => { setFeedback(value); setAnnouncement(`${value.title}. ${value.message}`); };
+  return <FeedbackContext.Provider value={show}>
+    {children}
+    <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">{feedback?.kind !== "error" ? announcement : ""}</span>
+    {feedback && <aside className={`r-feedback r-feedback-${feedback.kind}`} role={feedback.kind === "error" ? "alert" : undefined} aria-label="Estado de tu acción">
+      <span className="r-feedback-icon">{feedback.kind === "pending" ? <LoaderCircle className="r-spin" size={22}/> : feedback.kind === "error" ? <CircleAlert size={22}/> : <CircleCheck size={22}/>}</span>
+      <div><strong>{feedback.title}</strong><p>{feedback.message}</p>{feedback.cart && <Link to="/carrito" onClick={() => setFeedback(null)}>Ver mi carrito <ArrowRight size={16}/></Link>}</div>
+      {feedback.kind !== "pending" && <button onClick={() => setFeedback(null)} aria-label="Cerrar aviso"><X size={20}/></button>}
+    </aside>}
+  </FeedbackContext.Provider>;
+}
 export function CatalogCard({
   product: p,
   onAdd,
   busy,
+  adding = false,
+  added = false,
 }: {
   product: Product;
   onAdd: (p: Product) => void;
   busy: boolean;
+  adding?: boolean;
+  added?: boolean;
 }) {
   return (
     <article className="r-card">
@@ -72,7 +103,7 @@ export function CatalogCard({
             loading="lazy"
           />
         ) : (
-          <Flower2 size={80} strokeWidth={1} />
+          <div className="r-image-placeholder"><ImageIcon size={32} strokeWidth={1.5}/><span>Imagen del recurso</span></div>
         )}
         <span>
           {p.kind === "digital" ? "Imprimible digital" : "Material por encargo"}
@@ -87,8 +118,9 @@ export function CatalogCard({
         <strong>
           {money(p.price)} <small>ARS</small>
         </strong>
-        <button className="r-button" onClick={() => onAdd(p)} disabled={busy}>
-          <Plus size={18} /> Agregar al carrito
+        <button className={`r-button ${added ? "r-added" : ""}`} onClick={() => onAdd(p)} disabled={busy} aria-busy={adding}>
+          {adding ? <LoaderCircle size={18} className="r-spin"/> : added ? <Check size={18}/> : <ShoppingBag size={18}/>}
+          {adding ? "Agregando…" : added ? "Agregado al carrito" : "Agregar al carrito"}
         </button>
         <Link className="r-detail-link" to={`/producto/${p.id}`}>
           Ver qué incluye <ArrowRight size={16} />
@@ -180,6 +212,7 @@ function useCart() {
 function useCartActions() {
   const b = useBoot(),
     client = useQueryClient();
+  const feedback = useContext(FeedbackContext);
   const pending = useIsMutating({ mutationKey: ["cart-write"] }) > 0;
   const mutation = useMutation({
     mutationKey: ["cart-write"],
@@ -205,16 +238,19 @@ function useCartActions() {
     },
     retry: false,
     onMutate: async ({ p, action, quantity }) => {
+      feedback({kind:"pending", title:action === "add" ? "Agregando al carrito" : "Actualizando tu carrito", message:p.title});
       await client.cancelQueries({ queryKey: ["cart"] });
       const before = client.getQueryData<Cart>(["cart"])!;
       client.setQueryData(["cart"], nextCart(before, p, action, quantity));
       return { before };
     },
-    onSuccess: (value) => {
+    onSuccess: (value, { p, action }) => {
+      feedback({kind:"success", title:action === "add" ? "Agregado a tu carrito" : action === "remove" ? "Recurso quitado" : "Cantidad actualizada", message:p.title, cart:action === "add"});
       client.setQueryData(["cart"], value);
       client.removeQueries({ queryKey: ["checkout"] });
     },
-    onError: (_e, _v, context) => {
+    onError: (error, _v, context) => {
+      feedback({kind:"error", title:"No pudimos guardar el cambio", message:error instanceof Error ? error.message : "Revisá tu conexión y volvé a intentar."});
       if (context) client.setQueryData(["cart"], context.before);
       void client.invalidateQueries({ queryKey: ["cart"] });
     },
@@ -226,7 +262,8 @@ function Shop({ home = false }: { home?: boolean }) {
     client = useQueryClient(),
     [params, setParams] = useSearchParams(),
     actions = useCartActions();
-  const [notice, setNotice] = useState("");
+  const [addedId, setAddedId] = useState<number | null>(null);
+  useEffect(() => { if (addedId === null) return; const timer = window.setTimeout(() => setAddedId(null), 4000); return () => clearTimeout(timer); }, [addedId]);
   const searchKey = params.toString();
   const query = useQuery({
     queryKey: ["catalog", searchKey],
@@ -251,15 +288,14 @@ function Shop({ home = false }: { home?: boolean }) {
   const products = query.data?.products || [];
   const featured = b.store.featured_ids?.split(",").map(Number) || [];
   const visible =
-    home && featured.filter(Boolean).length
+    home && !searchKey && featured.filter(Boolean).length
       ? b.featured || products.filter((p) => featured.includes(p.id))
       : products;
   const add = (p: Product) =>
     actions.mutate(
       { p, action: "add" },
       {
-        onSuccess: (value) =>
-          setNotice(value.messages?.[0] || "Agregado al carrito"),
+        onSuccess: () => setAddedId(p.id),
       },
     );
   return (
@@ -268,7 +304,7 @@ function Shop({ home = false }: { home?: boolean }) {
         <section className="r-hero">
           <div>
             <span className="r-pill">
-              <Flower2 size={16} />
+              <span className="r-accent-line" aria-hidden="true"/>
               {b.store.hero_eyebrow}
             </span>
             <h1>{b.store.hero_title}</h1>
@@ -290,28 +326,14 @@ function Shop({ home = false }: { home?: boolean }) {
                 width="620"
                 height="560"
               />
-            ) : products[0]?.image ? (
-              <Link to={`/producto/${products[0].id}`}>
-                <img
-                  src={products[0].image}
-                  alt={products[0].title}
-                  width="620"
-                  height="560"
-                />
-                <span>
-                  {products[0].title} <ArrowRight size={20} />
-                </span>
-              </Link>
             ) : (
-              <>
-                <div className="r-play-shapes" aria-hidden="true"><span>Aa</span><span><Flower2 size={70} strokeWidth={1.5} /></span><span>1 2 3</span></div>
-                <h2>
-                  El juego es
-                  <br />
-                  el comienzo.
-                </h2>
-                <p>Imaginar · Crear · Aprender</p>
-              </>
+              <div className="r-hero-editorial">
+                <span className="r-eyebrow">PENSADO PARA CADA ETAPA</span>
+                <h2>Un recurso.<br/>Muchas formas<br/>de descubrir.</h2>
+                <p>Para el aula y para casa. Elegí una idea y hacela parte de su mundo.</p>
+                <Link to="/catalogo?tipo=digital"><span><Download size={22}/><strong>Para imprimir</strong><small>Recursos digitales</small></span><ArrowRight size={20}/></Link>
+                <Link to="/catalogo?tipo=physical"><span><Package size={22}/><strong>Para tener cerca</strong><small>Materiales por encargo</small></span><ArrowRight size={20}/></Link>
+              </div>
             )}
           </div>
         </section>
@@ -340,7 +362,7 @@ function Shop({ home = false }: { home?: boolean }) {
           <div>
             <small className="r-eyebrow">ELEGÍ TU PRÓXIMA IDEA</small>
             <h2>{home ? "Elegidos para vos" : "Encontrá tu recurso"}</h2>
-            <p>{query.data?.total ?? b.catalog.total} {(query.data?.total ?? b.catalog.total) === 1 ? "recurso disponible" : "recursos disponibles"}</p>
+            <p role="status" aria-live="polite">{query.isFetching && <LoaderCircle size={14} className="r-spin"/>} {query.isFetching ? "Actualizando · " : ""}{query.data?.total ?? b.catalog.total} {(query.data?.total ?? b.catalog.total) === 1 ? "recurso disponible" : "recursos disponibles"}</p>
           </div>
           <div className="r-tabs">
             {[
@@ -421,18 +443,20 @@ function Shop({ home = false }: { home?: boolean }) {
         ) : !query.data ? (
           <Skeleton />
         ) : (
-          <div className={`r-products ${query.isFetching ? "r-updating" : ""}`}>
+          <div className={`r-products ${query.isFetching ? "r-updating" : ""}`} aria-busy={query.isFetching}>
             {visible.map((p) => (
               <CatalogCard
                 key={p.id}
                 product={p}
                 onAdd={add}
                 busy={actions.isPending}
+                adding={actions.isPending && actions.variables?.p.id === p.id}
+                added={addedId === p.id}
               />
             ))}
             {!visible.length && (
               <div className="r-empty">
-                <Flower2 size={48} />
+                <SearchX size={40} strokeWidth={1.5}/>
                 <h3>
                   {searchKey
                     ? "No encontramos recursos con esos filtros."
@@ -472,18 +496,7 @@ function Shop({ home = false }: { home?: boolean }) {
             )}
           </nav>
         )}
-        {actions.isError && <ErrorBox error={actions.error} />}
       </section>
-      {notice && (
-        <div className="r-toast" role="status">
-          <Check size={20} />
-          <span>{notice}</span>
-          <Link to="/carrito">Ver carrito →</Link>
-          <button onClick={() => setNotice("")} aria-label="Cerrar aviso">
-            ×
-          </button>
-        </div>
-      )}
       <HowTo />
       {b.store.show_faq === "1" && (
         <section className="r-faq">
@@ -512,7 +525,7 @@ function Shop({ home = false }: { home?: boolean }) {
       )}
       {b.store.show_story === "1" && (
         <section className="r-story">
-          <Flower2 size={36} />
+          <span className="r-eyebrow">NUESTRO RINCÓN</span>
           <h2>{b.store.story_title}</h2>
           <p>{b.store.story_text}</p>
         </section>
@@ -606,7 +619,7 @@ function ProductPage() {
           {p.image ? (
             <img src={p.image} alt={p.title} width="600" height="600" />
           ) : (
-            <Flower2 size={120} />
+            <ImageIcon size={48} strokeWidth={1.5}/>
           )}
         </div>
         <div className="r-product-info">
@@ -646,7 +659,7 @@ function ProductPage() {
               )
             }
           >
-            Comprar ahora <ArrowRight size={20} />
+            {actions.isPending ? <LoaderCircle className="r-spin" size={20}/> : <ArrowRight size={20}/>}{actions.isPending ? "Preparando tu pedido…" : "Comprar ahora"}
           </button>
           <button
             className="r-button r-secondary"
@@ -658,16 +671,15 @@ function ProductPage() {
               )
             }
           >
-            {added ? <Check size={20} /> : <Plus size={20} />}{" "}
-            {added ? "Agregado al carrito" : "Agregar al carrito"}
+            {actions.isPending ? <LoaderCircle className="r-spin" size={20}/> : added ? <Check size={20} /> : <ShoppingBag size={20}/>}{" "}
+            {actions.isPending ? "Agregando…" : added ? "Agregado al carrito" : "Agregar al carrito"}
           </button>
           {added && (
             <Link className="r-detail-link" to="/carrito">
               Revisar mi selección →
             </Link>
           )}
-          {actions.isError && <ErrorBox error={actions.error} />}
-          <small>
+            <small>
             Comprás como invitado. El pago se realiza después de crear el
             pedido.
           </small>
@@ -716,7 +728,7 @@ function CartPage() {
                   {p.image ? (
                     <img src={p.image} alt={p.title} width="100" height="100" />
                   ) : (
-                    <Flower2 size={40} />
+                    <ImageIcon size={28} strokeWidth={1.5}/>
                   )}
                 </Link>
                 <div>
@@ -776,8 +788,7 @@ function CartPage() {
                 <strong>{money(p.price * quantity)}</strong>
               </article>
             ))}
-            {actions.isError && <ErrorBox error={actions.error} />}
-            <Link className="r-back" to="/catalogo">
+                <Link className="r-back" to="/catalogo">
               <ChevronLeft size={18} /> Seguir explorando
             </Link>
           </div>
@@ -1047,8 +1058,8 @@ function CheckoutPage() {
         </div>
         <Summary cart={d}>
           <button className="r-button" disabled={busy} type="submit">
-            {busy ? "Creando tu pedido…" : "Crear pedido y continuar al pago"}{" "}
-            <ArrowRight size={18} />
+            {busy ? <LoaderCircle className="r-spin" size={18}/> : <ArrowRight size={18}/>}
+            {busy ? "Creando tu pedido…" : "Crear pedido y continuar al pago"}
           </button>
           <small>No se cobra al pulsar este botón.</small>
           <a href="/privacidad">Cómo cuidamos tus datos</a>
@@ -1117,13 +1128,13 @@ function NavigationEffects() {
       h?.focus({ preventScroll: true });
     }, 0);
     return () => clearTimeout(timer);
-  }, [location.pathname, location.search, b]);
+  }, [location.pathname, b]);
   return null;
 }
 export function App({ bootstrap: b }: { bootstrap: Bootstrap }) {
   return (
     <Context.Provider value={b}>
-      <Layout />
+      <FeedbackProvider><Layout /></FeedbackProvider>
     </Context.Provider>
   );
 }
@@ -1157,7 +1168,7 @@ function Layout() {
         Ir al contenido
       </a>
       {b.store.announcement && (
-        <div className="r-announcement">✿ {b.store.announcement} ✿</div>
+        <div className="r-announcement">{b.store.announcement}</div>
       )}
       <header className="r-header">
         <Link className="r-brand" to="/">
@@ -1169,7 +1180,7 @@ function Layout() {
               height="42"
             />
           ) : (
-            <Flower2 size={38} strokeWidth={1.5} />
+            <span className="r-brand-mark" aria-hidden="true"><BookOpen size={24}/></span>
           )}
           <span>
             {b.store.brand_name}
@@ -1198,7 +1209,7 @@ function Layout() {
             aria-label="Cambiar modo claro u oscuro"
           >
             {mode === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-            <span>Modo</span>
+            <span>{document.body.dataset.mode === "dark" ? "Claro" : "Oscuro"}</span>
           </button>
         </nav>
       </header>
@@ -1239,7 +1250,7 @@ function Layout() {
       </main>
       <footer className="r-footer">
         <div>
-          <Flower2 size={32} />
+          <span className="r-brand-mark" aria-hidden="true"><BookOpen size={24}/></span>
           <h2>{b.store.brand_name}</h2>
           <p>{b.store.brand_tagline}</p>
           <small>{b.store.location}</small>

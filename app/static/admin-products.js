@@ -38,7 +38,7 @@
         const list = document.createElement('ul');
         for (const file of data.files) {
           const row = document.createElement('li');
-          row.append(button((file.kind === 'folder' ? '▣ ' : file.kind === 'image' ? 'Portada · ' : 'Archivo · ') + file.name, () => {
+          row.append(button((file.kind === 'folder' ? 'Carpeta · ' : file.kind === 'image' ? 'Portada · ' : 'Archivo · ') + file.name, () => {
             if (file.kind === 'folder') {load(file.id); return;}
             const name = file.kind === 'image' ? 'drive_image' : 'drive_file';
             form.elements[name].value = file.id;
@@ -60,12 +60,16 @@
     for (const [local, remote] of [['image','drive_image'],['digital_file','drive_file']]) {
       form.elements[local].addEventListener('change', () => {if (form.elements[local].files.length) {form.elements[remote].value = ''; selection.textContent = '';}});
     }
+    for (const input of form.querySelectorAll('input[type=file]')) {
+      const status = document.createElement('p'); status.className = 'local-file-status'; status.setAttribute('role','status'); input.after(status);
+      input.addEventListener('change', () => { const file = input.files[0]; status.textContent = file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB. Se cargará al guardar.` : ''; });
+    }
     if (!modal?.contains(form)) return;
     form.addEventListener('submit', async event => {
       event.preventDefault(); if (saving) return;
       saving = true; const submit = form.querySelector('[type="submit"], .editor-save button');
       const error = form.querySelector('[data-product-error]');
-      submit.disabled = true; error.textContent = 'Guardando recurso…';
+      const originalLabel = submit.textContent; submit.disabled = true; submit.setAttribute('aria-busy','true'); submit.textContent = 'Guardando…'; error.dataset.state = 'pending'; error.textContent = 'Guardando el recurso y sus archivos. Esperá un momento.';
       try {
         const response = await fetch(form.action, {method:'POST', body:new FormData(form), headers:{'X-Product-Modal':'1', Accept:'application/json'}});
         if (response.redirected) throw new Error('La sesión venció. Volvé a ingresar al panel.');
@@ -73,11 +77,15 @@
         const data = await response.json();
         if (!response.ok || !data.saved) throw new Error(data.error || 'No pudimos guardar el recurso.');
         dirty = false; location.reload();
-      } catch (problem) {error.textContent = problem.message;}
-      finally {saving = false; submit.disabled = false;}
+      } catch (problem) {error.dataset.state = 'error'; error.textContent = problem.message;}
+      finally {saving = false; submit.disabled = false; submit.removeAttribute('aria-busy'); submit.textContent = originalLabel;}
     });
   }
   document.querySelectorAll('.product-editor').forEach(mount);
+  document.querySelectorAll('.resource-actions form, .resource-more form, .sample-products form').forEach(form => form.addEventListener('submit', event => {
+    if (event.defaultPrevented) return;
+    const submit = form.querySelector('button'); submit.disabled = true; submit.textContent = 'Procesando…'; submit.setAttribute('aria-busy','true');
+  }));
   document.querySelectorAll('[data-product-modal]').forEach(link => link.addEventListener('click', async event => {
     if (!modal || !modal.showModal || event.ctrlKey || event.metaKey) return;
     event.preventDefault(); opener = link; dirty = false;

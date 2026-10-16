@@ -31,7 +31,7 @@
       {% for product in products %}
       <article class="resource-card">
         <a class="resource-cover" href="{{ url_for('main.preview_product', identifier=product.id) }}" aria-label="Vista previa de {{ product.title }}">
-          {% if product.image %}<img src="{{ url_for('main.image', filename=product.image) }}" alt="" width="480" height="360" loading="lazy">{% else %}<span class="resource-placeholder" aria-hidden="true">✿</span>{% endif %}
+          {% if product.image %}<img src="{{ url_for('main.image', filename=product.image) }}" alt="" width="480" height="360" loading="lazy">{% else %}<span class="resource-placeholder">Sin portada</span>{% endif %}
           <span class="status-pill {{ 'status-published' if product.published else 'status-draft' }}">{{ 'Archivado' if visibility=='archived' else 'Publicado' if product.published else 'Borrador' }}</span>
         </a>
         <div class="resource-copy"><small>{{ product.category }} · {{ 'Digital' if product.kind=='digital' else 'Físico' }}</small><h3>{{ product.title }}</h3><p class="muted">{{ product.age or 'Sin edad definida' }}</p><strong class="resource-price">{{ product.price_cents|money }}</strong>
