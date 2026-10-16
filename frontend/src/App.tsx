@@ -1209,7 +1209,7 @@ function Layout() {
             aria-label="Cambiar modo claro u oscuro"
           >
             {mode === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-            <span>{document.body.dataset.mode === "dark" ? "Claro" : "Oscuro"}</span>
+            <span>Tema</span>
           </button>
         </nav>
       </header>
