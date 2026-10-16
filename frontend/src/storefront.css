@@ -596,8 +596,10 @@ body[data-mode="dark"] .r-app {
 .r-product-layout {
   display: grid;
   gap: 26px;
+  align-items: start;
 }
 .r-product-photo {
+  min-width: 0;
   border-radius: 24px;
   background: var(--r-card);
   border: 1px solid var(--r-border);
@@ -613,6 +615,7 @@ body[data-mode="dark"] .r-app {
   border-radius: 24px;
 }
 .r-product-info {
+  min-width: 0;
   text-align: center;
   display: grid;
   gap: 16px;
@@ -1134,7 +1137,7 @@ body[data-mode="dark"] .r-app {
     gap: 24px;
   }
   .r-product-layout {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 50px;
   }
   .r-product-info {
