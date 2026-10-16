@@ -94,7 +94,7 @@ def register(app):
         if not enabled: return dict(react_storefront=False)
         entry=json.loads(manifest.read_text())['src/main.tsx']
         options=settings()
-        public={key:value for key,value in options.items() if key not in ('order_email','payment_instructions','shipping_origin')}
+        public={key:value for key,value in options.items() if key not in ('order_email','payment_instructions')}
         featured_ids=[int(value) for value in options['featured_ids'].split(',') if value.isdigit()]
         featured=[product_data(p) for p in db().scalars(select(Product).where(Product.published.is_(True),Product.id.in_(featured_ids)))] if featured_ids else []
         data=dict(featured=featured,store=public,csrf=generate_csrf(),cart=cart_data(),catalog=catalogue(),categories=db().scalars(select(Product.category).where(Product.published.is_(True)).distinct().order_by(Product.category)).all(),whatsapp=whatsapp_url(options),consent=session.get('analytics_consent'),admin=bool(session.get('admin_id')),revision=app.config['APP_REVISION'])

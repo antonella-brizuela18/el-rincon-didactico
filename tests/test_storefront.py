@@ -78,6 +78,7 @@ def test_bootstrap_has_no_operator_email_or_payment_instructions(client):
     if 'rincon-bootstrap' not in response.text: return # fully working fallback before frontend build
     payload=json.loads(re.search(r'<script id="rincon-bootstrap"[^>]*>(.*?)</script>',response.text,re.S).group(1))
     assert 'payment_instructions' not in payload['store'] and 'order_email' not in payload['store']
+    assert payload['store']['shipping_origin']=='8000'
     assert 'original.pdf' not in json.dumps(payload)
     assert 'experience.js' not in response.text
 
